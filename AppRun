@@ -1,0 +1,5 @@
+#!/bin/sh
+# AppRun para o AppImage: executa o binário PyInstaller.
+HERE="$(dirname "$(readlink -f "$0")")"
+cd "$HERE" || exit 1
+exec "$HERE/usr/bin/CalculadoraIMC" "$@"

@@ -93,6 +93,7 @@ em `dist/CalculadoraIMC`.
 | `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
 | `build.sh`         | Script de build do executável                                  |
 | `CalculadoraIMC.desktop` | Atalho do AppImage (com `StartupWMClass`)                |
+| `AppRun`            | Ponto de entrada do AppImage (executa o binário)               |
 | `icone.png`        | Ícone da aplicação                                             |
 | `calculadora_imc.db` | Banco SQLite gerado pelo app em execução                     |
 
@@ -120,10 +121,20 @@ mkdir -p AppDir/usr/bin
 cp dist/CalculadoraIMC AppDir/usr/bin/
 cp icone.png AppDir/
 cp CalculadoraIMC.desktop AppDir/
+cp AppRun AppDir/          # AppRun obrigatório (executa o binário)
 
 # 4. Empacotar
 ./appimagetool AppDir
 # gera: Calculadora_de_IMC_Profissional-1.0.0-x86_64.AppImage
+```
+
+O `AppRun` é o ponto de entrada do AppImage e executa o binário PyInstaller:
+
+```sh
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+cd "$HERE" || exit 1
+exec "$HERE/usr/bin/CalculadoraIMC" "$@"
 ```
 
 O arquivo de atalho `CalculadoraIMC.desktop` (versionado na raiz do projeto) já
