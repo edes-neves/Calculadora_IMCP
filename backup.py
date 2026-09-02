@@ -9,8 +9,9 @@ from email.mime.text import MIMEText
 from datetime import datetime
 
 import config
+import caminhos
 
-PASTA_BACKUPS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
+PASTA_BACKUPS = os.path.join(caminhos.diretorio_dados(), "backups")
 MAX_BACKUPS = 10
 
 

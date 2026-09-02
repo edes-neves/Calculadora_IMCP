@@ -102,8 +102,7 @@ class AppIMC(ctk.CTk):
             self.destroy()
 
     def _caminho_banco(self):
-        base = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(base, getattr(self.db, "db_name", "calculadora_imc.db"))
+        return self.db.db_name
 
     def _configurar_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")

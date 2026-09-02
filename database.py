@@ -1,5 +1,8 @@
+import os
 import sqlite3
 from datetime import datetime
+
+import caminhos
 
 # Limites lógicos de validação (kg / m / anos)
 LIMITES = {
@@ -13,7 +16,9 @@ LIMITES = {
 
 
 class Database:
-    def __init__(self, db_name="calculadora_imc.db"):
+    def __init__(self, db_name=None):
+        if db_name is None:
+            db_name = caminhos.caminho_banco()
         self.db_name = db_name
         self.criar_tabelas()
 

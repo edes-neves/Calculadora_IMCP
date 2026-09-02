@@ -1,9 +1,10 @@
 import json
 import os
 
+import caminhos
+
 # Nome do arquivo de configuração (fora do controle de versão via .gitignore)
-CAMINHO_CONFIG = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "config_smtp.json")
+CAMINHO_CONFIG = os.path.join(caminhos.diretorio_dados(), "config_smtp.json")
 
 CHAVES = ("host", "porta", "usuario", "senha", "destinatario", "tls", "enviar_email")
 

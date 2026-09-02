@@ -86,6 +86,7 @@ em `dist/CalculadoraIMC`.
 | `backup.py`        | Backup .zip local, rotação e envio por e-mail (SMTP)           |
 | `config.py`        | Persistência das configurações SMTP (`config_smtp.json`)       |
 | `logger.py`        | Logs em arquivo e exception hook global                        |
+| `caminhos.py`      | Resolução dos diretórios de dados (dev x AppImage)             |
 | `test_database.py` | Testes unitários da camada de dados e cálculos                 |
 | `test_ui.py`       | Testes da interface (parsing, cálculo, PDF, dashboard, busca)  |
 | `test_backup.py`   | Testes do backup e da exportação CSV/JSON                      |
@@ -154,5 +155,7 @@ StartupWMClass=CalculadoraDeIMCProfissional
 StartupNotify=true
 ```
 
-> O AppImage gera o banco, os logs e os backups na mesma pasta em que é
-> executado (por usar `__file__`/`sys._MEIPASS` para localizar os arquivos).
+> Em desenvolvimento, o app usa a pasta do projeto. No executável e no AppImage,
+> o banco, os logs, as configs SMTP e os backups são guardados em
+> `~/.local/share/CalculadoraIMC/` (persistente e gravável), nunca dentro do
+> pacote temporário.

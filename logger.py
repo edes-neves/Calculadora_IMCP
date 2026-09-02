@@ -5,7 +5,9 @@ import traceback
 
 from datetime import datetime
 
-PASTA_LOGS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+import caminhos
+
+PASTA_LOGS = os.path.join(caminhos.diretorio_dados(), "logs")
 
 
 def configurar_logging():
