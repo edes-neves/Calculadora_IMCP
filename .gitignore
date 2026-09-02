@@ -9,6 +9,10 @@ venv/
 *.db
 *.db-journal
 
+# Backup e configuração SMTP (contém credenciais)
+backups/
+config_smtp.json
+
 # Relatórios gerados
 relatorios/
 

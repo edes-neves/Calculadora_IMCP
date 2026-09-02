@@ -7,6 +7,8 @@ from urllib.parse import quote
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
+import backup
+import config
 import grafico
 import relatorio
 from database import Database, LIMITES
@@ -79,6 +81,26 @@ class AppIMC(ctk.CTk):
         if self.perfis:
             self.selecionar_perfil(self.perfis[0][0])
 
+        self.protocol("WM_DELETE_WINDOW", self._ao_fechar)
+
+    def _ao_fechar(self):
+        """Executa o backup automático (local + e-mail se configurado) antes de sair."""
+        try:
+            zip_criado, email_ok, msg = backup.backup_completo(self._caminho_banco())
+            if zip_criado:
+                info = f"Backup automático salvo em:\n{zip_criado}"
+                if config.configurado_para_email(config.carregar_config()):
+                    info += "\n\n" + msg
+                messagebox.showinfo("Backup realizado", info)
+        except Exception:
+            pass
+        finally:
+            self.destroy()
+
+    def _caminho_banco(self):
+        base = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, getattr(self.db, "db_name", "calculadora_imc.db"))
+
     def _configurar_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=20, pady=(16, 4))
@@ -114,7 +136,12 @@ class AppIMC(ctk.CTk):
         menu_arquivo = Menu(self._menubar, tearoff=0)
         menu_arquivo.add_command(label="Exportar PDF (resultado)", command=self.exportar_pdf)
         menu_arquivo.add_separator()
-        menu_arquivo.add_command(label="Sair", command=self.destroy)
+        menu_arquivo.add_command(label="Exportar dados (CSV)", command=self.exportar_csv)
+        menu_arquivo.add_command(label="Exportar dados (JSON)", command=self.exportar_json)
+        menu_arquivo.add_separator()
+        menu_arquivo.add_command(label="Configurações", command=self._abrir_configuracoes)
+        menu_arquivo.add_separator()
+        menu_arquivo.add_command(label="Sair", command=self._ao_fechar)
 
         menu_editar = Menu(self._menubar, tearoff=0)
         menu_editar.add_command(label="Novo Perfil", command=lambda: self._ir_para_aba("Perfil"))
@@ -849,6 +876,134 @@ class AppIMC(ctk.CTk):
             messagebox.showinfo("Exportar PDF", f"Relatório salvo em:\n{caminho}")
         except Exception as e:
             messagebox.showerror("Erro", f"Não foi possível gerar o PDF:\n{e}")
+
+    def _exportar_dados(self, tipo):
+        ext = "csv" if tipo == "csv" else "json"
+        nome_sugerido = f"dados_imc.{ext}"
+        caminho = self._selecionar_local_para_salvar(nome_sugerido)
+        if not caminho:
+            return
+        try:
+            if tipo == "csv":
+                self.db.exportar_csv(caminho)
+            else:
+                self.db.exportar_json(caminho)
+            messagebox.showinfo("Exportar dados",
+                                f"Dados exportados em:\n{caminho}")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Não foi possível exportar:\n{e}")
+
+    def exportar_csv(self):
+        self._exportar_dados("csv")
+
+    def exportar_json(self):
+        self._exportar_dados("json")
+
+    def _abrir_configuracoes(self):
+        cfg = config.carregar_config()
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Configurações")
+        dialog.geometry("520x560")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        dialog.lift()
+        dialog.focus_force()
+
+        ctk.CTkLabel(dialog, text="Backup automático",
+                     font=("Arial", 18, "bold")).pack(pady=(18, 4))
+        ctk.CTkLabel(dialog, text="Um backup .zip local é feito automaticamente ao fechar o app.",
+                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
+
+        est = ctk.CTkFrame(dialog, corner_radius=12, fg_color=("#EDF1F4", "#2A2F37"))
+        est.pack(fill="x", padx=24, pady=6)
+        self.lbl_backup_status = ctk.CTkLabel(
+            est, text="", font=("Arial", 13), justify="center", wraplength=440)
+        self.lbl_backup_status.pack(padx=12, pady=10)
+
+        linha = ctk.CTkFrame(dialog, height=2, corner_radius=1, fg_color=COR_PRIMARIA)
+        linha.pack(fill="x", padx=30, pady=12)
+
+        ctk.CTkLabel(dialog, text="Envio por e-mail (opcional)",
+                     font=("Arial", 16, "bold")).pack(pady=(0, 6))
+        ctk.CTkLabel(dialog, text="Deixe em branco para desativar o envio.",
+                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
+
+        form = ctk.CTkFrame(dialog, fg_color="transparent")
+        form.pack(padx=30)
+
+        def campo(rotulo, valor, show=None, largura=380):
+            ctk.CTkLabel(form, text=rotulo, font=("Arial", 12), anchor="w").pack(anchor="w")
+            e = ctk.CTkEntry(form, width=largura, height=34, corner_radius=10,
+                             show=show, border_color=("#C8CDD2", "#3A424D"))
+            e.insert(0, valor)
+            e.pack(pady=(2, 8))
+            return e
+
+        e_host = campo("Servidor SMTP (ex: smtp.gmail.com)", cfg["host"])
+        e_porta = campo("Porta (ex: 587 ou 465)", cfg["porta"])
+        e_usuario = campo("Usuário (seu e-mail)", cfg["usuario"])
+        e_senha = campo("Senha de aplicativo", cfg["senha"], show="*")
+        e_dest = campo("Destinatário (para onde enviar)", cfg["destinatario"])
+
+        frame_tls = ctk.CTkFrame(form, fg_color="transparent")
+        frame_tls.pack(anchor="w", pady=(0, 6))
+        usar_tls = ctk.BooleanVar(value=bool(cfg.get("tls")))
+        ctk.CTkCheckBox(frame_tls, text="Usar STARTTLS (segurança)",
+                        variable=usar_tls).pack(side="left")
+        usar_email = ctk.BooleanVar(value=bool(cfg.get("enviar_email")))
+        ctk.CTkCheckBox(frame_tls, text="Ativar envio automático",
+                        variable=usar_email).pack(side="left", padx=(18, 0))
+
+        frame_btn = ctk.CTkFrame(dialog, fg_color="transparent")
+        frame_btn.pack(pady=12)
+
+        def salvar():
+            dados = {
+                "host": e_host.get().strip(),
+                "porta": e_porta.get().strip(),
+                "usuario": e_usuario.get().strip(),
+                "senha": e_senha.get(),
+                "destinatario": e_dest.get().strip(),
+                "tls": "1" if usar_tls.get() else "",
+                "enviar_email": "1" if usar_email.get() else "",
+            }
+            config.salvar_config(dados)
+            self._atualizar_status_backup(dialog)
+            messagebox.showinfo("Configurações", "Configurações salvas.", parent=dialog)
+
+        def testar():
+            sucesso, msg = backup.enviar_email(
+                "Teste - Calculadora de IMC", "Este é um teste de envio automático de backup.")
+            if sucesso:
+                messagebox.showinfo("Teste de e-mail", msg, parent=dialog)
+            else:
+                messagebox.showerror("Erro", msg, parent=dialog)
+
+        ctk.CTkButton(frame_btn, text="Salvar", width=120, height=38, corner_radius=13,
+                      fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
+                      command=salvar).pack(side="left", padx=6)
+        ctk.CTkButton(frame_btn, text="Testar envio", width=130, height=38, corner_radius=13,
+                      fg_color="#1F6AA5", hover_color="#15507E",
+                      command=testar).pack(side="left", padx=6)
+        ctk.CTkButton(frame_btn, text="Fechar", width=100, height=38, corner_radius=13,
+                      fg_color="#6B7280", hover_color="#565E67",
+                      command=dialog.destroy).pack(side="left", padx=6)
+
+        self._atualizar_status_backup(dialog)
+
+    def _atualizar_status_backup(self, dialog=None):
+        if not hasattr(self, "lbl_backup_status"):
+            return
+        cfg = config.carregar_config()
+        if config.configurado_para_email(cfg):
+            txt = f"E-mail ativo  →  {cfg['destinatario']}"
+            cor = COR_SUCESSO
+        else:
+            txt = "E-mail desativado (preencha os campos e marque 'Ativar envio automático')."
+            cor = COR_AVISO
+        self.lbl_backup_status.configure(text=txt, text_color=cor)
 
     def _selecionar_local_para_salvar(self, nome_sugerido):
         """Abre a navegação a partir da pasta do usuário, sem exibir pastas ocultas ('.*')."""

@@ -311,3 +311,50 @@ class Database:
                 (perfil_id,),
             )
             return cursor.fetchone()
+
+    # ---------- Exportação (CSV / JSON) ----------
+    def coletar_dados_exportacao(self):
+        """Coleta todos os perfis e seus registros para exportação."""
+        with self.conectar() as conn:
+            cursor = conn.cursor()
+            perfil_cols = ["id", "nome", "idade", "genero", "meta_peso", "data_criacao"]
+            cursor.execute("SELECT id, nome, idade, genero, meta_peso, data_criacao FROM perfil ORDER BY id")
+            perfis = [dict(zip(perfil_cols, linha)) for linha in cursor.fetchall()]
+
+            hist_cols = ["id", "perfil_id", "peso", "altura", "idade", "genero",
+                         "imc", "classificacao", "data_registro", "cintura_cm",
+                         "quadril_cm", "gordura_pct", "rcq", "risco_cintura"]
+            cursor.execute(
+                "SELECT id, perfil_id, peso, altura, idade, genero, imc, classificacao, "
+                "data_registro, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura "
+                "FROM historico ORDER BY perfil_id, id")
+            historico = [dict(zip(hist_cols, linha)) for linha in cursor.fetchall()]
+            return {"perfis": perfis, "historico": historico}
+
+    def exportar_json(self, caminho):
+        import json as _json
+        dados = self.coletar_dados_exportacao()
+        with open(caminho, "w", encoding="utf-8") as f:
+            _json.dump(dados, f, ensure_ascii=False, indent=2)
+        return caminho
+
+    def exportar_csv(self, caminho):
+        import csv as _csv
+        dados = self.coletar_dados_exportacao()
+        with open(caminho, "w", newline="", encoding="utf-8") as f:
+            if dados["perfis"]:
+                perfil_cols = list(dados["perfis"][0].keys())
+                writer = _csv.DictWriter(f, fieldnames=perfil_cols)
+                writer.writeheader()
+                writer.writerows(dados["perfis"])
+            else:
+                f.write("perfis_vazio\n")
+            f.write("\n")
+            if dados["historico"]:
+                hist_cols = list(dados["historico"][0].keys())
+                writer = _csv.DictWriter(f, fieldnames=hist_cols)
+                writer.writeheader()
+                writer.writerows(dados["historico"])
+            else:
+                f.write("historico_vazio\n")
+        return caminho

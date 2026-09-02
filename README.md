@@ -17,6 +17,18 @@ exportação de relatório em PDF.
 - **Evolução**: gráfico de linha com a trajetória do IMC ao longo do tempo.
 - **Meta de peso**: define uma meta por paciente e mostra a distância até ela.
 - **Exportar PDF**: relatório profissional com os dados da medição, composição corporal e recomendação personalizada.
+- **Exportar dados**: exporta todos os perfis e medições em **CSV** ou **JSON** (menu Arquivo).
+- **Backup automático**: ao fechar o app, um backup compactado (.zip) do banco é salvo na pasta `backups/` (roteação automática das últimas 10 cópias).
+- **Envio por e-mail (opcional)**: é possível configurar SMTP no menu Arquivo → Configurações para receber o backup por e-mail. As credenciais ficam salvas em `config_smtp.json` (fora do Git). Deixe os campos vazios para desativar.
+
+## Configuração do envio por e-mail
+
+1. No menu **Arquivo → Configurações**, preencha servidor SMTP, porta, usuário, senha de aplicativo e destinatário.
+2. Marque **"Ativar envio automático"** (e **STARTTLS** se o servidor usar, como o Gmail na porta 587).
+3. Clique em **Testar envio** para validar antes de usar.
+4. Ao fechar o app, o backup .zip é enviado para o e-mail configurado (além de salvo localmente).
+
+> Dica (Gmail): gere uma "Senha de aplicativo" em Conta Google → Segurança, e use a porta 587 com STARTTLS.
 
 ## Como rodar
 
