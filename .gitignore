@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Banco de dados
+*.db
+*.db-journal
+
+# Relatórios gerados
+relatorios/
+
+# Artefatos de build (PyInstaller)
+build/
+dist/
+
+# Artefatos IDEs
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db
