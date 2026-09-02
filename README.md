@@ -33,8 +33,27 @@ python main.py
 ## Como testar
 
 ```bash
+# Testes da camada de dados e dos cálculos
 python -m unittest test_database -v
+
+# Testes de interface (parsing de entrada, fluxo de cálculo e PDFs)
+python -m unittest test_ui -v
+
+# Rodar todos os testes
+python -m unittest discover -v
 ```
+
+## Como gerar o executável (build)
+
+```bash
+pip install -r requirements-dev.txt   # inclui o PyInstaller
+./build.sh                              # Linux/macOS
+# ou:
+python -m PyInstaller CalculadoraIMC.spec --noconfirm
+```
+
+O executável único (com a interface, o ícone e todas as dependências) é gerado
+em `dist/CalculadoraIMC`.
 
 ## Estrutura
 

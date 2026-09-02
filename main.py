@@ -1,4 +1,5 @@
 import os
+import sys
 import webbrowser
 from tkinter import Menu, messagebox
 from urllib.parse import quote
@@ -41,7 +42,8 @@ class AppIMC(ctk.CTk):
         self._configurar_icone()
 
     def _configurar_icone(self):
-        icone = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icone.png")
+        base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        icone = os.path.join(base, "icone.png")
         if os.path.exists(icone):
             self._icone_janela = ImageTk.PhotoImage(Image.open(icone).resize((64, 64), Image.LANCZOS))
             self.iconphoto(True, self._icone_janela)
