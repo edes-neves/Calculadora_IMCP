@@ -59,6 +59,7 @@ class Database:
                 cursor.execute("DROP TABLE historico_antigo")
             else:
                 self._criar_tabela_historico(cursor)
+            self._migrar_colunas(cursor)
             conn.commit()
 
     @staticmethod
@@ -74,9 +75,29 @@ class Database:
                 imc REAL NOT NULL,
                 classificacao TEXT NOT NULL,
                 data_registro TEXT NOT NULL,
+                cintura_cm REAL,
+                quadril_cm REAL,
+                gordura_pct REAL,
+                rcq REAL,
+                risco_cintura TEXT,
                 FOREIGN KEY (perfil_id) REFERENCES perfil (id) ON DELETE CASCADE
             )
         """)
+
+    @staticmethod
+    def _migrar_colunas(cursor):
+        """Adiciona colunas novas ao schema do histórico em bancos já existentes."""
+        colunas = [r[1] for r in cursor.execute("PRAGMA table_info(historico)").fetchall()]
+        novas = {
+            "cintura_cm": "REAL",
+            "quadril_cm": "REAL",
+            "gordura_pct": "REAL",
+            "rcq": "REAL",
+            "risco_cintura": "TEXT",
+        }
+        for nome, tipo in novas.items():
+            if nome not in colunas:
+                cursor.execute(f"ALTER TABLE historico ADD COLUMN {nome} {tipo}")
 
     # ---------- Perfis ----------
     def criar_perfil(self, nome, idade, genero):
@@ -184,23 +205,72 @@ class Database:
     def validar_idade(idade):
         return LIMITES["idade_min"] <= idade <= LIMITES["idade_max"]
 
-    def salvar_registro(self, perfil_id, peso, altura, idade, genero):
+    def salvar_registro(self, perfil_id, peso, altura, idade, genero,
+                        cintura_cm=None, quadril_cm=None):
         imc = peso / (altura ** 2)
         classificacao = self.classificar_imc(imc, idade)
+        gordura = self.calcular_gordura_corporal(imc, idade, genero) if idade > 0 else None
+        rcq = self.calcular_rcq(cintura_cm, quadril_cm)
+        risco = self.classificar_risco_cintura(cintura_cm, genero)
         data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
 
         with self.conectar() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO historico (perfil_id, peso, altura, idade, genero, imc, classificacao, data_registro)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO historico (
+                    perfil_id, peso, altura, idade, genero, imc, classificacao, data_registro,
+                    cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (perfil_id, peso, altura, idade, genero, round(imc, 2), classificacao, data_atual),
+                (perfil_id, peso, altura, idade, genero, round(imc, 2), classificacao, data_atual,
+                 cintura_cm, quadril_cm, gordura, rcq, risco),
             )
             conn.commit()
 
         return round(imc, 2), classificacao
+
+    @staticmethod
+    def calcular_gordura_corporal(imc, idade, genero):
+        """% de gordura estimado pela fórmula de Deurenberg (adultos) e ajuste em idosos.
+
+        Retorna None quando o IMC informado está fora da faixa recomendada para a fórmula.
+        """
+        if not (20 <= imc <= 25):
+            return None
+        if idade < 16 or idade > 100:
+            return None
+        if genero == "Feminino":
+            gordura = 1.20 * imc + 0.23 * idade - 5.4 - 10.8
+        elif genero == "Masculino":
+            gordura = 1.20 * imc + 0.23 * idade - 5.4 - 0.0
+        else:
+            gordura = 1.20 * imc + 0.23 * idade - 5.4
+        return round(gordura, 1)
+
+    @staticmethod
+    def calcular_rcq(cintura_cm, quadril_cm):
+        if cintura_cm is None or quadril_cm is None or quadril_cm <= 0:
+            return None
+        return round(cintura_cm / quadril_cm, 2)
+
+    @staticmethod
+    def classificar_risco_cintura(cintura_cm, genero):
+        """Risco cardiovascular pela cintura (OMS)."""
+        if cintura_cm is None:
+            return None
+        if genero == "Feminino":
+            if cintura_cm < 80:
+                return "Baixo"
+            if cintura_cm < 88:
+                return "Moderado"
+            return "Elevado"
+        if cintura_cm < 94:
+            return "Baixo"
+        if cintura_cm < 102:
+            return "Moderado"
+        return "Elevado"
 
     def buscar_historico(self, perfil_id):
         with self.conectar() as conn:
@@ -227,6 +297,17 @@ class Database:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT imc, classificacao FROM historico WHERE perfil_id = ? ORDER BY id DESC LIMIT 1",
+                (perfil_id,),
+            )
+            return cursor.fetchone()
+
+    def buscar_ultima_medicao_detalhada(self, perfil_id):
+        """Retorna peso, altura, imc, cintura, quadril, gordura, rcq e risco da última medição."""
+        with self.conectar() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT peso, altura, imc, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura "
+                "FROM historico WHERE perfil_id = ? ORDER BY id DESC LIMIT 1",
                 (perfil_id,),
             )
             return cursor.fetchone()

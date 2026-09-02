@@ -10,10 +10,11 @@ exportação de relatório em PDF.
 - **Perfis / Pacientes**: cadastro, edição e exclusão de pessoas com nome, idade e gênero. Ao clicar em **Editar**, os dados do perfil selecionado são carregados no formulário para alteração e salvamento.
 - **Cálculo do IMC**: seletor de perfil na própria aba (ordenado por cadastro), indicador visual em barra de faixas coloridas (OMS/SBGG) e faixa de peso ideal.
 - **Validação de entrada**: limites realistas para peso, altura e idade; aceita vírgula como separador decimal; atalho para entrada em centímetros.
+- **Composição corporal**: campos opcionais de cintura e quadril para estimar a % de gordura corporal (fórmula de Deurenberg), o RCQ e o risco cardiovascular pela circunferência da cintura (OMS).
 - **Histórico**: todas as medições por paciente, com opção de limpar.
 - **Evolução**: gráfico de linha com a trajetória do IMC ao longo do tempo.
 - **Meta de peso**: define uma meta por paciente e mostra a distância até ela.
-- **Exportar PDF**: relatório profissional com os dados da medição.
+- **Exportar PDF**: relatório profissional com os dados da medição, composição corporal e recomendação personalizada.
 
 ## Como rodar
 

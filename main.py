@@ -525,17 +525,31 @@ class AppIMC(ctk.CTk):
                                          border_color=("#C8CDD2", "#3A424D"))
         self.entry_altura.grid(row=1, column=1, padx=6, pady=(0, 10))
 
+        ctk.CTkLabel(frame_inputs, text="Cintura (cm) (opcional):", font=("Arial", 13)).grid(
+            row=4, column=0, padx=(20, 6), pady=(8, 6), sticky="w")
+        self.entry_cintura = ctk.CTkEntry(frame_inputs, placeholder_text="Ex: 88",
+                                          width=180, height=38, corner_radius=12,
+                                          border_color=("#C8CDD2", "#3A424D"))
+        self.entry_cintura.grid(row=5, column=0, padx=(20, 6), pady=(0, 10))
+
+        ctk.CTkLabel(frame_inputs, text="Quadril (cm) (opcional):", font=("Arial", 13)).grid(
+            row=4, column=1, padx=6, pady=(8, 6), sticky="w")
+        self.entry_quadril = ctk.CTkEntry(frame_inputs, placeholder_text="Ex: 104",
+                                          width=190, height=38, corner_radius=12,
+                                          border_color=("#C8CDD2", "#3A424D"))
+        self.entry_quadril.grid(row=5, column=1, padx=6, pady=(0, 10))
+
         self.btn_cm = ctk.CTkButton(frame_inputs, text="Usar cm", width=86, height=38, corner_radius=12,
                                     fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
                                     command=self.converter_cm_para_m)
-        self.btn_cm.grid(row=1, column=2, rowspan=2, padx=(6, 20), pady=(0, 10))
+        self.btn_cm.grid(row=1, column=2, padx=(6, 20), pady=(0, 10))
 
         self.lbl_limites = ctk.CTkLabel(frame_inputs,
                                         text=f"Limites aceitos: peso {LIMITES['peso_min']}-{LIMITES['peso_max']}kg, "
                                              f"altura {LIMITES['altura_min']}-{LIMITES['altura_max']}m, "
                                              f"idade {LIMITES['idade_min']}-{LIMITES['idade_max']} anos",
                                         font=("Arial", 11), text_color=COR_TEXTO_MUT)
-        self.lbl_limites.grid(row=2, column=0, columnspan=3, padx=20, pady=(4, 14))
+        self.lbl_limites.grid(row=7, column=0, columnspan=3, padx=20, pady=(4, 14))
 
         self.btn_calcular = ctk.CTkButton(self.tab_calculo, text="Calcular IMC", font=("Arial", 17, "bold"),
                                           height=52, width=300, corner_radius=16,
@@ -554,6 +568,10 @@ class AppIMC(ctk.CTk):
         self.lbl_peso_ideal = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 13, "italic"),
                                            text_color=COR_TEXTO_MUT)
         self.lbl_peso_ideal.pack(pady=2)
+
+        self.lbl_saude = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 12),
+                                      text_color=COR_INFO, wraplength=520, justify="center")
+        self.lbl_saude.pack(pady=2)
 
         self.lbl_barra = ctk.CTkLabel(self.frame_resultado, text="")
         self.lbl_barra.pack(pady=8)
@@ -592,6 +610,40 @@ class AppIMC(ctk.CTk):
             return valor / 100.0
         return valor
 
+    @staticmethod
+    def _ler_medida_cm(texto):
+        """Converte texto vazio/opcional em float ou None."""
+        texto = texto.strip()
+        if not texto:
+            return None
+        try:
+            valor = float(texto.replace(",", "."))
+        except ValueError:
+            return None
+        return valor if 10 <= valor <= 300 else None
+
+    def _ler_medidas_corpo(self):
+        return (self._ler_medida_cm(self.entry_cintura.get()),
+                self._ler_medida_cm(self.entry_quadril.get()))
+
+    def _atualizar_label_saude(self, detalhe):
+        if not detalhe:
+            self.lbl_saude.configure(text="")
+            return
+        _, _, _, cintura, quadril, gordura, rcq, risco = detalhe
+        partes = []
+        if gordura is not None:
+            partes.append(f"Gordura estimada: {gordura:.1f}%")
+        if cintura is not None:
+            partes.append(f"Cintura: {cintura:.0f} cm")
+        if quadril is not None:
+            partes.append(f"Quadril: {quadril:.0f} cm")
+        if rcq is not None:
+            partes.append(f"RCQ: {rcq:.2f}")
+        if risco:
+            partes.append(f"Risco (cintura): {risco}")
+        self.lbl_saude.configure(text="  •  ".join(partes))
+
     def processar_calculo(self):
         if not self.perfil_atual_id:
             self.lbl_classificacao.configure(text="Selecione um perfil primeiro.", text_color=COR_PERIGO)
@@ -617,17 +669,25 @@ class AppIMC(ctk.CTk):
             self._erro_calculo(f"Altura deve estar entre {LIMITES['altura_min']} e {LIMITES['altura_max']} m.")
             return
 
-        imc, classe = self.db.salvar_registro(self.perfil_atual_id, peso, altura, idade, genero)
+        cintura, quadril = self._ler_medidas_corpo()
+
+        imc, classe = self.db.salvar_registro(
+            self.perfil_atual_id, peso, altura, idade, genero,
+            cintura_cm=cintura, quadril_cm=quadril)
         p_min, p_max = self.db.calcular_peso_ideal(altura, idade)
 
         cor_texto = self._cor_para_classificacao(classe)
         self._ultimo_resultado = (peso, altura, imc, classe, p_min, p_max, cor_texto)
+
+        detalhe = self.db.buscar_ultima_medicao_detalhada(self.perfil_atual_id)
+        self._ultima_saude = detalhe
 
         self.lbl_resultado_imc.configure(text=f"IMC: {imc}", text_color=cor_texto)
         self.lbl_classificacao.configure(text=classe, text_color=cor_texto)
         self.lbl_peso_ideal.configure(
             text=f"Para esta altura, a faixa de peso recomendada é de {p_min:.1f}kg a {p_max:.1f}kg.",
             text_color=COR_TEXTO_MUT)
+        self._atualizar_label_saude(detalhe)
 
         try:
             barras_png = grafico.gerar_barra_imc(imc, idade)
@@ -645,6 +705,7 @@ class AppIMC(ctk.CTk):
         self.lbl_resultado_imc.configure(text="Erro", text_color=COR_PERIGO)
         self.lbl_classificacao.configure(text=mensagem, text_color=COR_PERIGO)
         self.lbl_peso_ideal.configure(text="")
+        self.lbl_saude.configure(text="")
         self.lbl_barra.configure(image="", text="")
 
     @staticmethod
@@ -677,9 +738,11 @@ class AppIMC(ctk.CTk):
 
         perfil = self.db.buscar_perfil(self.perfil_atual_id)
         meta = perfil[4] if perfil else None
+        saude = getattr(self, "_ultima_saude", None)
         try:
             relatorio.gerar_pdf_relatorio(
-                caminho, p[1], p[2], p[3], peso, altura, imc, classe, p_min, p_max, cor, meta)
+                caminho, p[1], p[2], p[3], peso, altura, imc, classe, p_min, p_max,
+                cor, meta, saude=saude)
             messagebox.showinfo("Exportar PDF", f"Relatório salvo em:\n{caminho}")
         except Exception as e:
             messagebox.showerror("Erro", f"Não foi possível gerar o PDF:\n{e}")

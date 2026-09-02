@@ -145,6 +145,19 @@ class TestGraficosERelatorio(unittest.TestCase):
         self.assertTrue(os.path.exists(caminho))
         self.assertTrue(os.path.getsize(caminho) > 0)
 
+    def test_gera_pdf_com_recomendacao_e_composicao(self):
+        caminho = os.path.join(self.tmpdir, "relatorio_saude.pdf")
+        db = database.Database(self.tmp)
+        pid = db.criar_perfil("Com Saude", 40, "Masculino")
+        imc, classe = db.salvar_registro(pid, 88, 1.75, 40, "Masculino",
+                                         cintura_cm=96, quadril_cm=98)
+        detalhe = db.buscar_ultima_medicao_detalhada(pid)
+        relatorio.gerar_pdf_relatorio(caminho, "Com Saude", 40, "Masculino",
+                                      88, 1.75, imc, classe, 56.0, 76.0, "#F97316",
+                                      72.0, saude=detalhe)
+        self.assertTrue(os.path.exists(caminho))
+        self.assertTrue(os.path.getsize(caminho) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()

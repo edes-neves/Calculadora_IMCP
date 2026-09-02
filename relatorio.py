@@ -6,9 +6,63 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Image
 
 
+def _quebrar_linhas(texto, canvas, largura_util):
+    """Quebra um texto longo em várias linhas respeitando a largura disponível."""
+    palavras = texto.split()
+    linhas, atual = [], ""
+    for pal in palavras:
+        teste = f"{atual} {pal}".strip()
+        if canvas.stringWidth(teste, "Helvetica", 10.5) <= largura_util:
+            atual = teste
+        else:
+            if atual:
+                linhas.append(atual)
+            atual = pal
+    if atual:
+        linhas.append(atual)
+    return linhas
+
+
+def _gerar_recomendacao(classe, saude, p_min, p_max):
+    """Monta uma recomendação personalizada com base na classificação e nas medidas."""
+    texto = (f"Recomenda-se manter o peso dentro da faixa ideal de "
+             f"{p_min:.1f} kg a {p_max:.1f} kg, aliado a alimentação equilibrada "
+             f"e atividade física regular.")
+    if saude:
+        _, _, _, cintura, quadril, _g, rcq, risco = saude
+        if risco == "Elevado":
+            texto += (" Atenção: a circunferência da cintura indica risco cardiovascular "
+                      "elevado; considere o acompanhamento de um profissional de saúde.")
+        elif risco == "Moderado":
+            texto += (" A circunferência da cintura indica risco cardiovascular moderado; "
+                      "é recomendável acompanhar a medida e melhorar hábitos.")
+        if rcq is not None:
+            if rcq >= 0.90:
+                texto += " O excesso de gordura abdominal (RCQ) merece atenção."
+            elif rcq <= 0.80 and _g is not None:
+                texto += " O perfil de gordura corporal está adequado."
+    if "Abaixo do Peso" in classe or "Baixo Peso" in classe:
+        texto += (" Seu IMC está abaixo do recomendado; busque um plano nutricional "
+                  "para ganho de peso saudável.")
+    elif "Sobrepeso" in classe:
+        texto += (" O sobrepeso aumenta o risco de doenças crônicas; a perda moderada "
+                  "de peso já traz benefícios significativos.")
+    elif "Obesidade" in classe:
+        texto += (" O quadro de obesidade deve ser acompanhado por profissionais de "
+                  "saúde para um plano de redução de peso seguro.")
+    else:
+        texto += " Mantenha os bons hábitos para conservar o estado atual."
+    return texto
+
+
 def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
-                        p_min, p_max, cor="#333333", meta=None, data=None):
-    """Gera um PDF com o resultado da medição e salva no caminho informado."""
+                        p_min, p_max, cor="#333333", meta=None, data=None, saude=None):
+    """Gera um PDF com o resultado da medição e salva no caminho informado.
+
+    ``saude`` é opcional e deve ser uma tupla na ordem retornada por
+    ``Database.buscar_ultima_medicao_detalhada``:
+    (peso, altura, imc, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura).
+    """
     c = canvas.Canvas(caminho, pagesize=A4)
     largura, altura_pagina = A4
     margem = 20 * mm
@@ -51,6 +105,22 @@ def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
         ("Classificação", classe),
     ])
 
+    if saude:
+        _, _, _, cintura, quadril, gordura, rcq, risco = saude
+        linhas = []
+        if cintura is not None:
+            linhas.append(("Cintura", f"{cintura:.0f} cm"))
+        if quadril is not None:
+            linhas.append(("Quadril", f"{quadril:.0f} cm"))
+        if gordura is not None:
+            linhas.append(("Gordura corporal (estimada)", f"{gordura:.1f}%"))
+        if rcq is not None:
+            linhas.append(("RCQ", f"{rcq:.2f}"))
+        if risco is not None:
+            linhas.append(("Risco (circ. cintura)", risco))
+        if linhas:
+            bloco("Composição corporal", linhas)
+
     c.setFont("Helvetica-Bold", 12)
     c.setFillColor("#00B4D8")
     c.drawString(margem, y, "Resultado")
@@ -69,6 +139,23 @@ def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
     if meta is not None:
         c.setFont("Helvetica", 11)
         c.drawString(margem + 5 * mm, y, f"Peso meta definido: {meta:.1f} kg")
+
+    # Recomendação personalizada
+    recomendacao = _gerar_recomendacao(classe, saude, p_min, p_max)
+    if recomendacao:
+        y -= 12 * mm
+        c.setFont("Helvetica-Bold", 12)
+        c.setFillColor("#00B4D8")
+        c.drawString(margem, y, "Recomendações")
+        y -= 8 * mm
+        c.setFont("Helvetica", 10.5)
+        c.setFillColor("#000000")
+        # Quebra o texto em várias linhas respeitando a largura útil
+        largura_util = (largura - 2 * margem - 10 * mm)
+        linhas_texto = _quebrar_linhas(recomendacao, c, largura_util)
+        for lin in linhas_texto:
+            c.drawString(margem + 5 * mm, y, lin)
+            y -= 6 * mm
 
     # Rodapé
     c.setFont("Helvetica", 9)

@@ -128,6 +128,64 @@ class TestDatabase(unittest.TestCase):
         self.db.excluir_historico_do_perfil(pid)
         self.assertEqual(self.db.buscar_historico(pid), [])
 
+    # ---------- Composição corporal (gordura, RCQ, risco) ----------
+    def test_gordura_corporal_deurenberg(self):
+        g = self.db.calcular_gordura_corporal(22, 30, "Masculino")
+        self.assertAlmostEqual(g, 1.20 * 22 + 0.23 * 30 - 5.4, places=1)
+        g_f = self.db.calcular_gordura_corporal(22, 30, "Feminino")
+        self.assertAlmostEqual(g_f, 1.20 * 22 + 0.23 * 30 - 5.4 - 10.8, places=1)
+
+    def test_gordura_fora_da_faixa_retorna_none(self):
+        self.assertIsNone(self.db.calcular_gordura_corporal(30, 30, "Masculino"))
+        self.assertIsNone(self.db.calcular_gordura_corporal(22, 15, "Masculino"))
+
+    def test_rcq(self):
+        self.assertAlmostEqual(self.db.calcular_rcq(90, 100), 0.9, places=2)
+        self.assertIsNone(self.db.calcular_rcq(None, 100))
+        self.assertIsNone(self.db.calcular_rcq(90, None))
+
+    def test_risco_cintura(self):
+        self.assertEqual(self.db.classificar_risco_cintura(78, "Feminino"), "Baixo")
+        self.assertEqual(self.db.classificar_risco_cintura(85, "Feminino"), "Moderado")
+        self.assertEqual(self.db.classificar_risco_cintura(90, "Feminino"), "Elevado")
+        self.assertEqual(self.db.classificar_risco_cintura(95, "Masculino"), "Moderado")
+        self.assertEqual(self.db.classificar_risco_cintura(80, "Masculino"), "Baixo")
+        self.assertIsNone(self.db.classificar_risco_cintura(None, "Masculino"))
+
+    def test_salvar_registro_com_cintura_e_quadril(self):
+        pid = self.db.criar_perfil("Saúde", 35, "Masculino")
+        self.db.salvar_registro(pid, 80, 1.8, 35, "Masculino",
+                                cintura_cm=95, quadril_cm=100)
+        detalhe = self.db.buscar_ultima_medicao_detalhada(pid)
+        self.assertIsNotNone(detalhe)
+        self.assertAlmostEqual(detalhe[3], 95.0)  # cintura
+        self.assertAlmostEqual(detalhe[4], 100.0)  # quadril
+        self.assertIsNotNone(detalhe[5])  # gordura
+        self.assertAlmostEqual(detalhe[6], 0.95)  # rcq
+        self.assertEqual(detalhe[7], "Moderado")  # risco
+
+    def test_migracao_adiciona_colunas_em_banco_antigo(self):
+        import sqlite3 as _sqlite3
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        os.unlink(tmp.name)
+        conn = _sqlite3.connect(tmp.name)
+        conn.execute("CREATE TABLE perfil (id INTEGER PRIMARY KEY, nome TEXT, idade INTEGER, genero TEXT, meta_peso REAL, data_criacao TEXT)")
+        conn.execute("CREATE TABLE historico (id INTEGER PRIMARY KEY, perfil_id INTEGER, peso REAL, altura REAL, idade INTEGER, genero TEXT, imc REAL, classificacao TEXT, data_registro TEXT)")
+        conn.execute("INSERT INTO perfil (nome, idade, genero, data_criacao) VALUES ('Antigo', 30, 'M', '01/01')")
+        conn.execute("INSERT INTO historico (perfil_id, peso, altura, idade, genero, imc, classificacao, data_registro) VALUES (1, 75, 1.75, 30, 'M', 24.5, 'Peso Normal', '01/01')")
+        conn.commit()
+        conn.close()
+        try:
+            db = Database(tmp.name)
+            colunas = [c[1] for c in db.conectar().execute("PRAGMA table_info(historico)").fetchall()]
+            for col in ("cintura_cm", "quadril_cm", "gordura_pct", "rcq", "risco_cintura"):
+                self.assertIn(col, colunas)
+            hist = db.buscar_historico(1)
+            self.assertEqual(len(hist), 1)
+        finally:
+            os.unlink(tmp.name)
+
 
 if __name__ == "__main__":
     unittest.main()
