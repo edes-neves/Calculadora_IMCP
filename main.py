@@ -39,8 +39,8 @@ class AppIMC(ctk.CTk):
 
         self.title("Calculadora de IMC Profissional")
         self.wm_title("Calculadora de IMC Profissional")
-        self.geometry("900x780")
-        self.minsize(880, 720)
+        self.geometry("920x840")
+        self.minsize(900, 820)
         self.resizable(True, True)
 
         self._configurar_icone()
@@ -112,16 +112,18 @@ class AppIMC(ctk.CTk):
         ctk.CTkLabel(header, text="Calculadora de IMC",
                      font=("Arial", 24, "bold")).pack(side="left")
         ctk.CTkLabel(header, text="Profissional",
-                     font=("Arial", 24, "bold"), text_color=COR_PRIMARIA).pack(side="left")
+                     font=("Arial", 24, "bold"), text_color=COR_PRIMARIA).pack(side="left", padx=(6, 0))
 
         self.btn_tema = ctk.CTkButton(
-            header, text="Modo Escuro", width=130, height=34, corner_radius=17,
+            header, text="Modo Escuro", width=100, height=34, corner_radius=17,
             fg_color=("#22262B", "#3A3F46"), hover_color=("#33383F", "#4A5058"),
             text_color=("#333333", "#E6E6E6"), command=self._alternar_tema)
         self.btn_tema.pack(side="right")
 
-        ctk.CTkLabel(header, text="  Índice de Massa Corporal",
-                     font=("Arial", 13), text_color=COR_TEXTO_MUT).pack(side="right")
+        texto_imc = ctk.CTkFrame(header, fg_color="transparent")
+        texto_imc.pack(side="right", padx=(0, 24))
+        ctk.CTkLabel(texto_imc, text="Índice de Massa Corporal",
+                     font=("Arial", 13), text_color=COR_TEXTO_MUT).pack(pady=(10, 0))
 
     def _alternar_tema(self):
         novo = "Light" if ctk.get_appearance_mode() == "Dark" else "Dark"
@@ -206,7 +208,7 @@ class AppIMC(ctk.CTk):
     def _sobre(self):
         dialog = ctk.CTkToplevel(self)
         dialog.title("Sobre")
-        dialog.geometry("560x500")
+        dialog.geometry("580x500")
         dialog.transient(self)
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -912,41 +914,48 @@ class AppIMC(ctk.CTk):
 
         dialog = ctk.CTkToplevel(self)
         dialog.title("Configurações")
-        dialog.geometry("520x560")
+        dialog.geometry("560x620")
+        dialog.minsize(520, 480)
         dialog.transient(self)
         dialog.grab_set()
-        dialog.resizable(False, False)
+        dialog.resizable(True, True)
         dialog.lift()
         dialog.focus_force()
 
-        ctk.CTkLabel(dialog, text="Backup automático",
-                     font=("Arial", 18, "bold")).pack(pady=(18, 4))
-        ctk.CTkLabel(dialog, text="Um backup .zip local é feito automaticamente ao fechar o app.",
+        # botões fixos na base (sempre visíveis)
+        frame_btn = ctk.CTkFrame(dialog, fg_color=("#FFFFFF", "#262A31"))
+        frame_btn.pack(side="bottom", fill="x", pady=(10, 12), padx=14)
+
+        # conteúdo rolável
+        scroll = ctk.CTkScrollableFrame(dialog, fg_color="transparent",
+                                        corner_radius=0, label_text="")
+        scroll.pack(fill="both", expand=True, padx=14, pady=(8, 0))
+
+        ctk.CTkLabel(scroll, text="Backup automático",
+                     font=("Arial", 18, "bold")).pack(pady=(10, 4))
+        ctk.CTkLabel(scroll, text="Um backup .zip local é feito automaticamente ao fechar o app.",
                      font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
 
-        est = ctk.CTkFrame(dialog, corner_radius=12, fg_color=("#EDF1F4", "#2A2F37"))
-        est.pack(fill="x", padx=24, pady=6)
+        est = ctk.CTkFrame(scroll, corner_radius=12, fg_color=("#EDF1F4", "#2A2F37"))
+        est.pack(fill="x", padx=10, pady=6)
         self.lbl_backup_status = ctk.CTkLabel(
             est, text="", font=("Arial", 13), justify="center", wraplength=440)
         self.lbl_backup_status.pack(padx=12, pady=10)
 
-        linha = ctk.CTkFrame(dialog, height=2, corner_radius=1, fg_color=COR_PRIMARIA)
-        linha.pack(fill="x", padx=30, pady=12)
-
-        ctk.CTkLabel(dialog, text="Envio por e-mail (opcional)",
-                     font=("Arial", 16, "bold")).pack(pady=(0, 6))
-        ctk.CTkLabel(dialog, text="Deixe em branco para desativar o envio.",
+        ctk.CTkLabel(scroll, text="Envio por e-mail (opcional)",
+                     font=("Arial", 16, "bold")).pack(pady=(6, 4))
+        ctk.CTkLabel(scroll, text="Deixe em branco para desativar o envio.",
                      font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
 
-        form = ctk.CTkFrame(dialog, fg_color="transparent")
-        form.pack(padx=30)
+        form = ctk.CTkFrame(scroll, fg_color="transparent")
+        form.pack(padx=10)
 
         def campo(rotulo, valor, show=None, largura=380):
-            ctk.CTkLabel(form, text=rotulo, font=("Arial", 12), anchor="w").pack(anchor="w")
-            e = ctk.CTkEntry(form, width=largura, height=34, corner_radius=10,
+            ctk.CTkLabel(form, text=rotulo, font=("Arial", 12), anchor="w").pack(anchor="w", padx=6)
+            e = ctk.CTkEntry(form, width=largura, height=32, corner_radius=10,
                              show=show, border_color=("#C8CDD2", "#3A424D"))
             e.insert(0, valor)
-            e.pack(pady=(2, 8))
+            e.pack(pady=(2, 8), padx=6)
             return e
 
         e_host = campo("Servidor SMTP (ex: smtp.gmail.com)", cfg["host"])
@@ -956,16 +965,13 @@ class AppIMC(ctk.CTk):
         e_dest = campo("Destinatário (para onde enviar)", cfg["destinatario"])
 
         frame_tls = ctk.CTkFrame(form, fg_color="transparent")
-        frame_tls.pack(anchor="w", pady=(0, 6))
+        frame_tls.pack(anchor="w", pady=(0, 6), padx=6)
         usar_tls = ctk.BooleanVar(value=bool(cfg.get("tls")))
         ctk.CTkCheckBox(frame_tls, text="Usar STARTTLS (segurança)",
                         variable=usar_tls).pack(side="left")
         usar_email = ctk.BooleanVar(value=bool(cfg.get("enviar_email")))
         ctk.CTkCheckBox(frame_tls, text="Ativar envio automático",
                         variable=usar_email).pack(side="left", padx=(18, 0))
-
-        frame_btn = ctk.CTkFrame(dialog, fg_color="transparent")
-        frame_btn.pack(pady=12)
 
         def salvar():
             dados = {
@@ -989,9 +995,10 @@ class AppIMC(ctk.CTk):
             else:
                 messagebox.showerror("Erro", msg, parent=dialog)
 
-        ctk.CTkButton(frame_btn, text="Salvar", width=120, height=38, corner_radius=13,
-                      fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
-                      command=salvar).pack(side="left", padx=6)
+        salvar_btn = ctk.CTkButton(frame_btn, text="Salvar", width=120, height=38, corner_radius=13,
+                                   fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
+                                   command=salvar)
+        salvar_btn.pack(side="left", padx=6)
         ctk.CTkButton(frame_btn, text="Testar envio", width=130, height=38, corner_radius=13,
                       fg_color="#1F6AA5", hover_color="#15507E",
                       command=testar).pack(side="left", padx=6)

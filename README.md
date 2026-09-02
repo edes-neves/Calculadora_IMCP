@@ -77,15 +77,68 @@ em `dist/CalculadoraIMC`.
 
 ## Estrutura
 
-| Arquivo          | Descrição                                                      |
-|------------------|----------------------------------------------------------------|
-| `main.py`        | Interface gráfica (CustomTkinter) e orquestração da aplicação  |
-| `database.py`    | Camada de dados SQLite (perfis, histórico, cálculos e regras)  |
-| `grafico.py`     | Geração das imagens (barra de faixas e gráfico de evolução)    |
-| `relatorio.py`   | Geração do relatório em PDF (ReportLab)                        |
-| `test_database.py` | Testes unitários da camada de dados e cálculos               |
-| `calculadora_imc.db` | Banco SQLite gerado pelo app                                 |
+| Arquivo            | Descrição                                                      |
+|--------------------|----------------------------------------------------------------|
+| `main.py`          | Interface gráfica (CustomTkinter) e orquestração da aplicação  |
+| `database.py`      | Camada de dados SQLite (perfis, histórico, cálculos e regras)  |
+| `grafico.py`       | Geração das imagens (barra de faixas e gráfico de evolução)    |
+| `relatorio.py`     | Geração do relatório em PDF (ReportLab)                        |
+| `backup.py`        | Backup .zip local, rotação e envio por e-mail (SMTP)           |
+| `config.py`        | Persistência das configurações SMTP (`config_smtp.json`)       |
+| `logger.py`        | Logs em arquivo e exception hook global                        |
+| `test_database.py` | Testes unitários da camada de dados e cálculos                 |
+| `test_ui.py`       | Testes da interface (parsing, cálculo, PDF, dashboard, busca)  |
+| `test_backup.py`   | Testes do backup e da exportação CSV/JSON                      |
+| `test_logger.py`   | Testes do logging e do tratamento de erros                     |
+| `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
+| `build.sh`         | Script de build do executável                                  |
+| `icone.png`        | Ícone da aplicação                                             |
+| `calculadora_imc.db` | Banco SQLite gerado pelo app em execução                     |
 
 > Observação: ao abrir pela primeira vez após a atualização, o app migra
 > automaticamente o banco antigo (histórico sem perfil) para um "Perfil padrão",
 > preservando os registros existentes.
+
+## Como gerar um AppImage (Linux)
+
+O AppImage é um executável autossuficiente que roda em qualquer distribuição Linux
+sem instalação. Pré-requisitos: `wget`, `unzip`, `python3-venv`, e o Kit de
+Desenvolvimento (Qt, GDK, etc.) para gerar o executável via PyInstaller.
+
+```bash
+# 1. Gerar o executável com PyInstaller (já contém todas as dependências)
+python -m PyInstaller CalculadoraIMC.spec --noconfirm
+
+# 2. Baixar o appimagetool
+wget -O appimagetool \
+  "https://github.com/AppImage/AppImageKit/releases/latest/download/appimagetool-x86_64.AppImage"
+chmod +x appimagetool
+
+# 3. Montar a estrutura AppDir
+mkdir -p AppDir/usr/bin
+cp dist/CalculadoraIMC AppDir/usr/bin/
+cp icone.png AppDir/
+
+# 4. Criar o arquivo de atalho (.desktop)
+#    (arquivo CalculadoraIMC.desktop com Name, Exec, Icon e Categories)
+
+# 5. Empacotar
+./appimagetool AppDir
+# gera: Calculadora_De_IMC_Profissional-1.0.0-x86_64.AppImage
+```
+
+O `.desktop` deve conter, por exemplo:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Calculadora de IMC Profissional
+Comment=Calculadora de IMC com classificação OMS
+Exec=CalculadoraIMC
+Icon=icone
+Terminal=false
+Categories=Utility;Health;
+```
+
+> O AppImage gera o banco, os logs e os backups na mesma pasta em que é
+> executado (por usar `__file__`/`sys._MEIPASS` para localizar os arquivos).
