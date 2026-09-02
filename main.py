@@ -232,17 +232,25 @@ class AppIMC(ctk.CTk):
     # ------------------------------------------------------------------
     def configurar_tela_perfil(self):
         frame_lista = ctk.CTkFrame(self.tab_perfil, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        frame_lista.pack(side="left", fill="both", expand=True, padx=(16, 8), pady=16)
+        frame_lista.pack(side="left", fill="both", expand=False, padx=(16, 8), pady=16, ipadx=30)
+        frame_lista.configure(width=360)
 
         ctk.CTkLabel(frame_lista, text="Pacientes / Perfis",
-                     font=("Arial", 18, "bold")).pack(pady=(16, 10))
+                     font=("Arial", 18, "bold")).pack(pady=(14, 6))
 
-        self.lista_perfis = ctk.CTkScrollableFrame(frame_lista, height=300, corner_radius=14,
+        self.entry_busca = ctk.CTkEntry(frame_lista, placeholder_text="Buscar paciente...",
+                                        width=240, height=34, corner_radius=10,
+                                        border_color=("#C8CDD2", "#3A424D"))
+        self.entry_busca.pack(pady=(0, 6), padx=14)
+        self.entry_busca.bind(
+            "<KeyRelease>", lambda e: self._filtrar_lista_perfis())
+
+        self.lista_perfis = ctk.CTkScrollableFrame(frame_lista, height=280, corner_radius=14,
                                                    fg_color="transparent")
-        self.lista_perfis.pack(fill="both", expand=True, padx=14, pady=6)
+        self.lista_perfis.pack(fill="both", expand=True, padx=14, pady=4)
 
         frame_botoes = ctk.CTkFrame(frame_lista, fg_color="transparent")
-        frame_botoes.pack(pady=(8, 16))
+        frame_botoes.pack(pady=(6, 16))
         self.btn_editar_perfil = ctk.CTkButton(
             frame_botoes, text="Editar", width=96, height=36, corner_radius=12,
             fg_color=("#1F6AA5", "#1F6AA5"), hover_color=COR_PRIMARIA,
@@ -254,8 +262,15 @@ class AppIMC(ctk.CTk):
             command=self.excluir_perfil_atual)
         self.btn_excluir_perfil.grid(row=0, column=1, padx=6)
 
-        frame_form = ctk.CTkFrame(self.tab_perfil, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        frame_form.pack(side="right", fill="y", padx=(8, 16), pady=16, anchor="ne")
+        frame_direito = ctk.CTkFrame(self.tab_perfil, fg_color="transparent")
+        frame_direito.pack(side="right", fill="both", expand=True, padx=(8, 16), pady=16)
+
+        frame_dash = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_dash.pack(side="top", fill="x", pady=(0, 10))
+        self._configurar_dashboard(frame_dash)
+
+        frame_form = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_form.pack(side="bottom", fill="y", expand=True)
         self.lbl_form_titulo = ctk.CTkLabel(frame_form, text="Novo Perfil", font=("Arial", 18, "bold"))
         self.lbl_form_titulo.pack(pady=(16, 12))
 
@@ -299,17 +314,95 @@ class AppIMC(ctk.CTk):
                                            text_color=COR_INFO, wraplength=240, justify="center")
         self.lbl_perfil_msg.pack(padx=16, pady=(0, 14))
 
-    def carregar_perfis(self):
-        self.perfis = self.db.listar_perfis()
-        self._map_seletor = {self._texto_perfil(p): p[0] for p in self.perfis}
+    def _configurar_dashboard(self, frame):
+        ctk.CTkLabel(frame, text="Visão Geral", font=("Arial", 16, "bold")).pack(
+            anchor="w", padx=16, pady=(14, 8))
 
+        self.dash_nome = ctk.CTkLabel(frame, text="Nenhum perfil selecionado",
+                                      font=("Arial", 15, "bold"), text_color=COR_PRIMARIA,
+                                      anchor="w", wraplength=250, justify="left")
+        self.dash_nome.pack(anchor="w", padx=16)
+
+        grid = ctk.CTkFrame(frame, fg_color="transparent")
+        grid.pack(fill="x", padx=12, pady=(10, 8))
+
+        cards = []
+        for i, titulo in enumerate(("IMC", "Classificação", "Último peso", "Meta")):
+            r, col = divmod(i, 2)
+            card = ctk.CTkFrame(grid, corner_radius=12, fg_color=("#F0F4F7", "#2A2F37"))
+            card.grid(row=r, column=col, padx=5, pady=5, sticky="ew")
+            grid.columnconfigure(col, weight=1)
+            ctk.CTkLabel(card, text=titulo, font=("Arial", 11), text_color=COR_TEXTO_MUT).pack(pady=(8, 0))
+            cards.append(card)
+
+        self.dash_imc_val = ctk.CTkLabel(cards[0], text="--", font=("Arial", 13, "bold"))
+        self.dash_classe_val = ctk.CTkLabel(cards[1], text="", font=("Arial", 12, "bold"))
+        self.dash_peso_val = ctk.CTkLabel(cards[2], text="", font=("Arial", 12, "bold"))
+        self.dash_meta_val = ctk.CTkLabel(cards[3], text="", font=("Arial", 12, "bold"))
+        for lbl in (self.dash_imc_val, self.dash_classe_val, self.dash_peso_val, self.dash_meta_val):
+            lbl.pack(pady=(0, 8))
+
+        self.dash_tendencia = ctk.CTkLabel(frame, text="", font=("Arial", 12),
+                                           text_color=COR_INFO, wraplength=250, justify="left")
+        self.dash_tendencia.pack(anchor="w", padx=16, pady=(4, 12))
+
+        self._frame_dashboard = frame
+
+    def _atualizar_dashboard(self):
+        if not hasattr(self, "dash_imc_val"):
+            return
+        if not self.perfil_atual_id:
+            self.dash_nome.configure(text="Nenhum perfil selecionado")
+            for lbl in (self.dash_imc_val, self.dash_classe_val, self.dash_peso_val, self.dash_meta_val):
+                lbl.configure(text="--")
+            self.dash_tendencia.configure(text="")
+            return
+        p = self.db.buscar_perfil(self.perfil_atual_id)
+        if not p:
+            return
+        self.dash_nome.configure(text=f"{p[1]}  ({p[2]} anos, {p[3]})")
+        ms = self.db.buscar_historico_cronologico(self.perfil_atual_id)
+        classe_atual = None
+        if ms:
+            ultimo = ms[-1]
+            peso, altura, imc, classe_atual, _data = ultimo
+            cor = self._cor_para_classificacao(classe_atual)
+            self.dash_imc_val.configure(text=f"{imc:.1f}", text_color=cor)
+            self.dash_classe_val.configure(text=classe_atual, text_color=cor)
+            self.dash_peso_val.configure(text=f"{peso:.1f} kg")
+            if len(ms) >= 2:
+                imc_anterior = ms[-2][2]
+                delta = imc - imc_anterior
+                sinal = "▲ subiu" if delta > 0.01 else ("▼ caiu" if delta < -0.01 else "estável")
+                self.dash_tendencia.configure(
+                    text=f"Tendência do IMC: {sinal} (última: {imc:.1f}, anterior: {imc_anterior:.1f})",
+                    text_color="#F39C12" if delta > 0.01 else COR_INFO)
+            else:
+                self.dash_tendencia.configure(text="Ainda sem medições suficientes para tendência.")
+        else:
+            self.dash_imc_val.configure(text="--")
+            self.dash_classe_val.configure(text="Sem medições")
+            self.dash_peso_val.configure(text="--")
+            self.dash_tendencia.configure(text="Registre a primeira medição na aba 'Calcular IMC'.")
+        meta = p[4]
+        self.dash_meta_val.configure(
+            text=f"{meta:.1f} kg" if meta is not None else "não definida")
+
+    def _filtrar_lista_perfis(self):
+        termo = self.entry_busca.get().strip().lower()
+        self._renderizar_lista_perfis(termo)
+
+    def _renderizar_lista_perfis(self, termo=""):
         for widget in self.lista_perfis.winfo_children():
             widget.destroy()
         for perfil in self.perfis:
             pid, nome, idade, genero = perfil
+            texto = f"{nome}   ({idade} anos, {genero})"
+            if termo and termo not in texto.lower():
+                continue
             btn = ctk.CTkButton(
                 self.lista_perfis,
-                text=f"{nome}   ({idade} anos, {genero})",
+                text=texto,
                 font=("Arial", 13),
                 anchor="w",
                 fg_color=("#E9EEF2", "#2B3037"),
@@ -319,7 +412,15 @@ class AppIMC(ctk.CTk):
                 command=lambda p=pid: self.selecionar_perfil(p),
             )
             btn.pack(fill="x", padx=9, pady=4)
+        if not self.lista_perfis.winfo_children():
+            ctk.CTkLabel(self.lista_perfis, text="Nenhum paciente encontrado.",
+                         font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=16)
 
+    def carregar_perfis(self):
+        self.perfis = self.db.listar_perfis()
+        self._map_seletor = {self._texto_perfil(p): p[0] for p in self.perfis}
+        self._renderizar_lista_perfis()
+        self._atualizar_dashboard()
         self._atualizar_combobox_calculo()
 
     def _texto_perfil(self, perfil):
@@ -372,6 +473,7 @@ class AppIMC(ctk.CTk):
                 self._atualizando_combobox = False
             self.lbl_perfil_msg.configure(text=f"Perfil ativo: {p[1]}")
         self.atualizar_telas_do_perfil()
+        self._atualizar_dashboard()
 
     def criar_perfil(self):
         if self._perfil_em_edicao:
@@ -484,6 +586,7 @@ class AppIMC(ctk.CTk):
             self.lbl_perfil_msg.configure(text="Nenhum perfil. Crie um novo.")
 
     def atualizar_telas_do_perfil(self):
+        self._atualizar_dashboard()
         self.atualizar_label_calculo()
         self.atualizar_lista_historico()
         self.atualizar_tela_evolucao()

@@ -102,6 +102,46 @@ class TestCalculoViaApp(unittest.TestCase):
         self.assertAlmostEqual(imc_exibido, round(imc_esperado, 2), places=2)
 
 
+class TestDashboardEBusca(unittest.TestCase):
+    """Testa o dashboard de resumo e a busca de pacientes da tela inicial."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mktemp(suffix=".db")
+        import shutil as _shutil
+        _shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calculadora_imc.db"),
+                     cls.tmp)
+        cls._orig = database.Database.conectar
+        database.Database.conectar = lambda self: sqlite3.connect(cls.tmp)
+
+    def setUp(self):
+        self.app = AppIMC()
+        self.app.update()
+
+    def tearDown(self):
+        if hasattr(self, "app") and self.app.winfo_exists():
+            self.app.destroy()
+
+    @classmethod
+    def tearDownClass(cls):
+        database.Database.conectar = cls._orig
+        if os.path.exists(cls.tmp):
+            os.unlink(cls.tmp)
+
+    def test_dashboard_tem_dados_do_perfil_ativo(self):
+        if self.app.perfil_atual_id is None:
+            self.skipTest("banco sem perfis")
+        self.assertNotEqual(self.app.dash_nome.cget("text"), "Nenhum perfil selecionado")
+
+    def test_busca_filtra_lista(self):
+        self.app.entry_busca.insert(0, "zzznaoexiste")
+        self.app._filtrar_lista_perfis()
+        self.assertEqual(len(self.app.lista_perfis.winfo_children()), 1)  # msg 'nenhum encontrado'
+        self.app.entry_busca.delete(0, "end")
+        self.app._filtrar_lista_perfis()
+        self.assertGreater(len(self.app.lista_perfis.winfo_children()), 1)
+
+
 class TestGraficosERelatorio(unittest.TestCase):
     """Testa a geração de imagens e do relatório/gráfico em PDF."""
 

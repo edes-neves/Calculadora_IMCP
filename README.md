@@ -8,6 +8,8 @@ exportação de relatório em PDF.
 ## Funcionalidades
 
 - **Perfis / Pacientes**: cadastro, edição e exclusão de pessoas com nome, idade e gênero. Ao clicar em **Editar**, os dados do perfil selecionado são carregados no formulário para alteração e salvamento.
+- **Visão geral (dashboard)**: resumo do perfil ativo com último IMC, classificação, peso e meta, além da tendência do IMC ao longo das medições.
+- **Busca de pacientes**: campo de pesquisa que filtra a lista de perfis em tempo real.
 - **Cálculo do IMC**: seletor de perfil na própria aba (ordenado por cadastro), indicador visual em barra de faixas coloridas (OMS/SBGG) e faixa de peso ideal.
 - **Validação de entrada**: limites realistas para peso, altura e idade; aceita vírgula como separador decimal; atalho para entrada em centímetros.
 - **Composição corporal**: campos opcionais de cintura e quadril para estimar a % de gordura corporal (fórmula de Deurenberg), o RCQ e o risco cardiovascular pela circunferência da cintura (OMS).
