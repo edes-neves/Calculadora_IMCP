@@ -92,6 +92,7 @@ em `dist/CalculadoraIMC`.
 | `test_logger.py`   | Testes do logging e do tratamento de erros                     |
 | `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
 | `build.sh`         | Script de build do executável                                  |
+| `CalculadoraIMC.desktop` | Atalho do AppImage (com `StartupWMClass`)                |
 | `icone.png`        | Ícone da aplicação                                             |
 | `calculadora_imc.db` | Banco SQLite gerado pelo app em execução                     |
 
@@ -118,16 +119,16 @@ chmod +x appimagetool
 mkdir -p AppDir/usr/bin
 cp dist/CalculadoraIMC AppDir/usr/bin/
 cp icone.png AppDir/
+cp CalculadoraIMC.desktop AppDir/
 
-# 4. Criar o arquivo de atalho (.desktop)
-#    (arquivo CalculadoraIMC.desktop com Name, Exec, Icon e Categories)
-
-# 5. Empacotar
+# 4. Empacotar
 ./appimagetool AppDir
-# gera: Calculadora_De_IMC_Profissional-1.0.0-x86_64.AppImage
+# gera: Calculadora_de_IMC_Profissional-1.0.0-x86_64.AppImage
 ```
 
-O `.desktop` deve conter, por exemplo:
+O arquivo de atalho `CalculadoraIMC.desktop` (versionado na raiz do projeto) já
+inclui o `StartupWMClass=CalculadoraDeIMCProfissional`, que permite aos
+gerenciadores de janela agrupar e aplicar o tema correto à janela do app:
 
 ```ini
 [Desktop Entry]
@@ -137,7 +138,9 @@ Comment=Calculadora de IMC com classificação OMS
 Exec=CalculadoraIMC
 Icon=icone
 Terminal=false
-Categories=Utility;Health;
+Categories=Utility;
+StartupWMClass=CalculadoraDeIMCProfissional
+StartupNotify=true
 ```
 
 > O AppImage gera o banco, os logs e os backups na mesma pasta em que é

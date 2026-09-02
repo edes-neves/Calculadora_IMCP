@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Calculadora de IMC Profissional
+Comment=Calculadora de IMC com classificacao OMS, historico, evolucao, metas e relatorio PDF
+Exec=CalculadoraIMC
+Icon=icone
+Terminal=false
+Categories=Utility;
+Keywords=IMC;saude;peso;indice;
+StartupWMClass=CalculadoraDeIMCProfissional
+StartupNotify=true
