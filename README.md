@@ -30,6 +30,11 @@ exportação de relatório em PDF.
 
 > Dica (Gmail): gere uma "Senha de aplicativo" em Conta Google → Segurança, e use a porta 587 com STARTTLS.
 
+## Logs e tratamento de erros
+
+- Exceções não capturadas são registradas em `logs/app_<data>.log` (não versionados no Git) com data/hora e stack trace, e uma janela amigável é exibida.
+- Eventos importantes (backups, exportações) também são registrados para auditoria.
+
 ## Como rodar
 
 ```bash

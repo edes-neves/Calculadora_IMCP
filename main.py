@@ -10,6 +10,7 @@ from PIL import Image, ImageTk
 import backup
 import config
 import grafico
+import logger
 import relatorio
 from database import Database, LIMITES
 
@@ -89,11 +90,13 @@ class AppIMC(ctk.CTk):
             zip_criado, email_ok, msg = backup.backup_completo(self._caminho_banco())
             if zip_criado:
                 info = f"Backup automático salvo em:\n{zip_criado}"
+                logger.LOGGER.info("Backup criado: %s", zip_criado)
                 if config.configurado_para_email(config.carregar_config()):
                     info += "\n\n" + msg
+                    logger.LOGGER.info("Backup por e-mail: %s", msg)
                 messagebox.showinfo("Backup realizado", info)
         except Exception:
-            pass
+            logger.LOGGER.exception("Falha no backup automático")
         finally:
             self.destroy()
 
@@ -874,7 +877,9 @@ class AppIMC(ctk.CTk):
                 caminho, p[1], p[2], p[3], peso, altura, imc, classe, p_min, p_max,
                 cor, meta, saude=saude)
             messagebox.showinfo("Exportar PDF", f"Relatório salvo em:\n{caminho}")
+            logger.LOGGER.info("PDF exportado: %s", caminho)
         except Exception as e:
+            logger.LOGGER.exception("Falha ao exportar PDF")
             messagebox.showerror("Erro", f"Não foi possível gerar o PDF:\n{e}")
 
     def _exportar_dados(self, tipo):
@@ -890,7 +895,9 @@ class AppIMC(ctk.CTk):
                 self.db.exportar_json(caminho)
             messagebox.showinfo("Exportar dados",
                                 f"Dados exportados em:\n{caminho}")
+            logger.LOGGER.info("Dados exportados (%s): %s", tipo, caminho)
         except Exception as e:
+            logger.LOGGER.exception("Falha ao exportar dados (%s)", tipo)
             messagebox.showerror("Erro", f"Não foi possível exportar:\n{e}")
 
     def exportar_csv(self):
@@ -1326,5 +1333,6 @@ class AppIMC(ctk.CTk):
 
 
 if __name__ == "__main__":
+    import logger
     app = AppIMC()
     app.mainloop()
