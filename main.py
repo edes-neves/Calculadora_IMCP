@@ -39,7 +39,8 @@ class AppIMC(ctk.CTk):
 
         self.title("Calculadora de IMC Profissional")
         self.wm_title("Calculadora de IMC Profissional")
-        self.geometry("900x760")
+        self.geometry("900x780")
+        self.minsize(880, 720)
         self.resizable(True, True)
 
         self._configurar_icone()
@@ -262,14 +263,14 @@ class AppIMC(ctk.CTk):
     # ------------------------------------------------------------------
     def configurar_tela_perfil(self):
         frame_lista = ctk.CTkFrame(self.tab_perfil, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        frame_lista.pack(side="left", fill="both", expand=False, padx=(16, 8), pady=16, ipadx=30)
+        frame_lista.pack(side="left", fill="both", expand=False, padx=(16, 8), pady=12, ipadx=30)
         frame_lista.configure(width=360)
 
         ctk.CTkLabel(frame_lista, text="Pacientes / Perfis",
-                     font=("Arial", 18, "bold")).pack(pady=(14, 6))
+                     font=("Arial", 18, "bold")).pack(pady=(12, 6))
 
         self.entry_busca = ctk.CTkEntry(frame_lista, placeholder_text="Buscar paciente...",
-                                        width=240, height=34, corner_radius=10,
+                                        width=240, height=32, corner_radius=10,
                                         border_color=("#C8CDD2", "#3A424D"))
         self.entry_busca.pack(pady=(0, 6), padx=14)
         self.entry_busca.bind(
@@ -280,51 +281,51 @@ class AppIMC(ctk.CTk):
         self.lista_perfis.pack(fill="both", expand=True, padx=14, pady=4)
 
         frame_botoes = ctk.CTkFrame(frame_lista, fg_color="transparent")
-        frame_botoes.pack(pady=(6, 16))
+        frame_botoes.pack(pady=(6, 12))
         self.btn_editar_perfil = ctk.CTkButton(
-            frame_botoes, text="Editar", width=96, height=36, corner_radius=12,
+            frame_botoes, text="Editar", width=96, height=34, corner_radius=12,
             fg_color=("#1F6AA5", "#1F6AA5"), hover_color=COR_PRIMARIA,
             command=self.editar_perfil_atual)
         self.btn_editar_perfil.grid(row=0, column=0, padx=6)
         self.btn_excluir_perfil = ctk.CTkButton(
-            frame_botoes, text="Excluir", width=96, height=36, corner_radius=12,
+            frame_botoes, text="Excluir", width=96, height=34, corner_radius=12,
             fg_color="#D64545", hover_color="#B83838",
             command=self.excluir_perfil_atual)
         self.btn_excluir_perfil.grid(row=0, column=1, padx=6)
 
         frame_direito = ctk.CTkFrame(self.tab_perfil, fg_color="transparent")
-        frame_direito.pack(side="right", fill="both", expand=True, padx=(8, 16), pady=16)
+        frame_direito.pack(side="right", fill="both", expand=True, padx=(8, 16), pady=12)
 
         frame_dash = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        frame_dash.pack(side="top", fill="x", pady=(0, 10))
+        frame_dash.pack(side="top", fill="x", pady=(0, 8))
         self._configurar_dashboard(frame_dash)
 
         frame_form = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
         frame_form.pack(side="bottom", fill="y", expand=True)
         self.lbl_form_titulo = ctk.CTkLabel(frame_form, text="Novo Perfil", font=("Arial", 18, "bold"))
-        self.lbl_form_titulo.pack(pady=(16, 12))
+        self.lbl_form_titulo.pack(pady=(10, 8))
 
         ctk.CTkLabel(frame_form, text="Nome:", font=("Arial", 13)).pack(anchor="w", padx=20)
-        self.entry_nome = ctk.CTkEntry(frame_form, width=220, height=38, corner_radius=12,
+        self.entry_nome = ctk.CTkEntry(frame_form, width=220, height=34, corner_radius=12,
                                        border_color=("#C8CDD2", "#3A424D"),
                                        placeholder_text="Nome do paciente")
-        self.entry_nome.pack(padx=20, pady=(6, 8))
+        self.entry_nome.pack(padx=20, pady=(4, 6))
 
         ctk.CTkLabel(frame_form, text="Idade:", font=("Arial", 13)).pack(anchor="w", padx=20)
-        self.entry_nome_idade = ctk.CTkEntry(frame_form, width=220, height=38, corner_radius=12,
+        self.entry_nome_idade = ctk.CTkEntry(frame_form, width=220, height=34, corner_radius=12,
                                              border_color=("#C8CDD2", "#3A424D"),
                                              placeholder_text="Ex: 45")
-        self.entry_nome_idade.pack(padx=20, pady=(6, 8))
+        self.entry_nome_idade.pack(padx=20, pady=(4, 6))
 
         ctk.CTkLabel(frame_form, text="Gênero:", font=("Arial", 13)).pack(anchor="w", padx=20)
         self.combobox_perfil_genero = ctk.CTkComboBox(frame_form, values=["Masculino", "Feminino", "Outro"],
-                                                      width=220, height=38, corner_radius=12,
+                                                      width=220, height=34, corner_radius=12,
                                                       border_color=("#C8CDD2", "#3A424D"))
         self.combobox_perfil_genero.set("Masculino")
-        self.combobox_perfil_genero.pack(padx=20, pady=(6, 8))
+        self.combobox_perfil_genero.pack(padx=20, pady=(4, 6))
 
         frame_form_botoes = ctk.CTkFrame(frame_form, fg_color="transparent")
-        frame_form_botoes.pack(pady=(18, 8))
+        frame_form_botoes.pack(pady=(12, 8))
         self.btn_criar_perfil = ctk.CTkButton(
             frame_form_botoes, text="Criar Perfil", width=130, height=38, corner_radius=14,
             fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
@@ -345,36 +346,36 @@ class AppIMC(ctk.CTk):
         self.lbl_perfil_msg.pack(padx=16, pady=(0, 14))
 
     def _configurar_dashboard(self, frame):
-        ctk.CTkLabel(frame, text="Visão Geral", font=("Arial", 16, "bold")).pack(
-            anchor="w", padx=16, pady=(14, 8))
+        ctk.CTkLabel(frame, text="Visão Geral", font=("Arial", 15, "bold")).pack(
+            anchor="w", padx=16, pady=(10, 6))
 
         self.dash_nome = ctk.CTkLabel(frame, text="Nenhum perfil selecionado",
-                                      font=("Arial", 15, "bold"), text_color=COR_PRIMARIA,
+                                      font=("Arial", 14, "bold"), text_color=COR_PRIMARIA,
                                       anchor="w", wraplength=250, justify="left")
         self.dash_nome.pack(anchor="w", padx=16)
 
         grid = ctk.CTkFrame(frame, fg_color="transparent")
-        grid.pack(fill="x", padx=12, pady=(10, 8))
+        grid.pack(fill="x", padx=12, pady=(8, 6))
 
         cards = []
         for i, titulo in enumerate(("IMC", "Classificação", "Último peso", "Meta")):
             r, col = divmod(i, 2)
             card = ctk.CTkFrame(grid, corner_radius=12, fg_color=("#F0F4F7", "#2A2F37"))
-            card.grid(row=r, column=col, padx=5, pady=5, sticky="ew")
+            card.grid(row=r, column=col, padx=5, pady=4, sticky="ew")
             grid.columnconfigure(col, weight=1)
-            ctk.CTkLabel(card, text=titulo, font=("Arial", 11), text_color=COR_TEXTO_MUT).pack(pady=(8, 0))
+            ctk.CTkLabel(card, text=titulo, font=("Arial", 10), text_color=COR_TEXTO_MUT).pack(pady=(6, 0))
             cards.append(card)
 
-        self.dash_imc_val = ctk.CTkLabel(cards[0], text="--", font=("Arial", 13, "bold"))
-        self.dash_classe_val = ctk.CTkLabel(cards[1], text="", font=("Arial", 12, "bold"))
-        self.dash_peso_val = ctk.CTkLabel(cards[2], text="", font=("Arial", 12, "bold"))
-        self.dash_meta_val = ctk.CTkLabel(cards[3], text="", font=("Arial", 12, "bold"))
+        self.dash_imc_val = ctk.CTkLabel(cards[0], text="--", font=("Arial", 12, "bold"))
+        self.dash_classe_val = ctk.CTkLabel(cards[1], text="", font=("Arial", 11, "bold"))
+        self.dash_peso_val = ctk.CTkLabel(cards[2], text="", font=("Arial", 11, "bold"))
+        self.dash_meta_val = ctk.CTkLabel(cards[3], text="", font=("Arial", 11, "bold"))
         for lbl in (self.dash_imc_val, self.dash_classe_val, self.dash_peso_val, self.dash_meta_val):
-            lbl.pack(pady=(0, 8))
+            lbl.pack(pady=(0, 6))
 
-        self.dash_tendencia = ctk.CTkLabel(frame, text="", font=("Arial", 12),
+        self.dash_tendencia = ctk.CTkLabel(frame, text="", font=("Arial", 11),
                                            text_color=COR_INFO, wraplength=250, justify="left")
-        self.dash_tendencia.pack(anchor="w", padx=16, pady=(4, 12))
+        self.dash_tendencia.pack(anchor="w", padx=16, pady=(2, 8))
 
         self._frame_dashboard = frame
 
@@ -627,76 +628,76 @@ class AppIMC(ctk.CTk):
     # ------------------------------------------------------------------
     def configurar_tela_calculo(self):
         frame_perfil_calculo = ctk.CTkFrame(self.tab_calculo, fg_color="transparent")
-        frame_perfil_calculo.pack(pady=(22, 0))
+        frame_perfil_calculo.pack(pady=(14, 0))
         ctk.CTkLabel(frame_perfil_calculo, text="Perfil:", font=("Arial", 14, "bold")).pack(side="left", padx=(0, 10))
         self.combobox_calculo_perfil = ctk.CTkComboBox(
-            frame_perfil_calculo, values=[], width=340, height=38, corner_radius=12,
+            frame_perfil_calculo, values=[], width=340, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
             state="readonly", command=self._ao_escolher_perfil_no_calculo)
         self.combobox_calculo_perfil.pack(side="left")
 
         self.lbl_calculo_perfil = ctk.CTkLabel(self.tab_calculo, text="Nenhum perfil selecionado",
                                                font=("Arial", 12), text_color=COR_INFO)
-        self.lbl_calculo_perfil.pack(pady=(8, 0))
+        self.lbl_calculo_perfil.pack(pady=(4, 0))
 
         frame_inputs = ctk.CTkFrame(self.tab_calculo, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        frame_inputs.pack(pady=18, padx=(60, 60), fill="x")
+        frame_inputs.pack(pady=12, padx=(60, 60), fill="x")
 
         ctk.CTkLabel(frame_inputs, text="Peso (kg):", font=("Arial", 14, "bold")).grid(
-            row=0, column=0, padx=(20, 6), pady=(22, 6), sticky="w")
+            row=0, column=0, padx=(20, 6), pady=(12, 4), sticky="w")
         self.entry_peso = ctk.CTkEntry(frame_inputs,
                                        placeholder_text=f"Ex: 87,8 ou 87.8  (2 - {int(LIMITES['peso_max'])})",
-                                       width=180, height=40, corner_radius=12,
+                                       width=180, height=34, corner_radius=12,
                                        border_color=("#C8CDD2", "#3A424D"))
-        self.entry_peso.grid(row=1, column=0, padx=(20, 6), pady=(0, 10))
+        self.entry_peso.grid(row=1, column=0, padx=(20, 6), pady=(0, 6))
 
         ctk.CTkLabel(frame_inputs, text="Altura (m):", font=("Arial", 14, "bold")).grid(
-            row=0, column=1, padx=6, pady=(22, 6), sticky="w")
+            row=0, column=1, padx=6, pady=(12, 4), sticky="w")
         self.entry_altura = ctk.CTkEntry(frame_inputs,
                                          placeholder_text=f"Ex: 1,75, 1.75 ou 175",
-                                         width=190, height=40, corner_radius=12,
+                                         width=190, height=34, corner_radius=12,
                                          border_color=("#C8CDD2", "#3A424D"))
-        self.entry_altura.grid(row=1, column=1, padx=6, pady=(0, 10))
+        self.entry_altura.grid(row=1, column=1, padx=6, pady=(0, 6))
 
         ctk.CTkLabel(frame_inputs, text="Cintura (cm) (opcional):", font=("Arial", 13)).grid(
-            row=4, column=0, padx=(20, 6), pady=(8, 6), sticky="w")
+            row=4, column=0, padx=(20, 6), pady=(6, 4), sticky="w")
         self.entry_cintura = ctk.CTkEntry(frame_inputs, placeholder_text="Ex: 88",
-                                          width=180, height=38, corner_radius=12,
+                                          width=180, height=32, corner_radius=12,
                                           border_color=("#C8CDD2", "#3A424D"))
-        self.entry_cintura.grid(row=5, column=0, padx=(20, 6), pady=(0, 10))
+        self.entry_cintura.grid(row=5, column=0, padx=(20, 6), pady=(0, 6))
 
         ctk.CTkLabel(frame_inputs, text="Quadril (cm) (opcional):", font=("Arial", 13)).grid(
-            row=4, column=1, padx=6, pady=(8, 6), sticky="w")
+            row=4, column=1, padx=6, pady=(6, 4), sticky="w")
         self.entry_quadril = ctk.CTkEntry(frame_inputs, placeholder_text="Ex: 104",
-                                          width=190, height=38, corner_radius=12,
+                                          width=190, height=32, corner_radius=12,
                                           border_color=("#C8CDD2", "#3A424D"))
-        self.entry_quadril.grid(row=5, column=1, padx=6, pady=(0, 10))
+        self.entry_quadril.grid(row=5, column=1, padx=6, pady=(0, 6))
 
-        self.btn_cm = ctk.CTkButton(frame_inputs, text="Usar cm", width=86, height=38, corner_radius=12,
+        self.btn_cm = ctk.CTkButton(frame_inputs, text="Usar cm", width=86, height=32, corner_radius=12,
                                     fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
                                     command=self.converter_cm_para_m)
-        self.btn_cm.grid(row=1, column=2, padx=(6, 20), pady=(0, 10))
+        self.btn_cm.grid(row=5, column=2, padx=(6, 20), pady=(0, 6))
 
         self.lbl_limites = ctk.CTkLabel(frame_inputs,
                                         text=f"Limites aceitos: peso {LIMITES['peso_min']}-{LIMITES['peso_max']}kg, "
                                              f"altura {LIMITES['altura_min']}-{LIMITES['altura_max']}m, "
                                              f"idade {LIMITES['idade_min']}-{LIMITES['idade_max']} anos",
                                         font=("Arial", 11), text_color=COR_TEXTO_MUT)
-        self.lbl_limites.grid(row=7, column=0, columnspan=3, padx=20, pady=(4, 14))
+        self.lbl_limites.grid(row=7, column=0, columnspan=3, padx=20, pady=(2, 8))
 
-        self.btn_calcular = ctk.CTkButton(self.tab_calculo, text="Calcular IMC", font=("Arial", 17, "bold"),
-                                          height=52, width=300, corner_radius=16,
+        self.btn_calcular = ctk.CTkButton(self.tab_calculo, text="Calcular IMC", font=("Arial", 16, "bold"),
+                                          height=46, width=300, corner_radius=16,
                                           fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                           command=self.processar_calculo)
-        self.btn_calcular.pack(pady=(14, 8))
+        self.btn_calcular.pack(pady=(10, 6))
 
         self.frame_resultado = ctk.CTkFrame(self.tab_calculo, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        self.frame_resultado.pack(pady=12, padx=(60, 60), fill="both")
+        self.frame_resultado.pack(pady=8, padx=(60, 60), fill="both")
 
-        self.lbl_resultado_imc = ctk.CTkLabel(self.frame_resultado, text="---", font=("Arial", 40, "bold"))
-        self.lbl_resultado_imc.pack(pady=(18, 2))
+        self.lbl_resultado_imc = ctk.CTkLabel(self.frame_resultado, text="---", font=("Arial", 34, "bold"))
+        self.lbl_resultado_imc.pack(pady=(10, 2))
         self.lbl_classificacao = ctk.CTkLabel(self.frame_resultado, text="Selecione um perfil e preencha os dados",
-                                              font=("Arial", 17, "bold"))
+                                              font=("Arial", 16, "bold"))
         self.lbl_classificacao.pack(pady=2)
         self.lbl_peso_ideal = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 13, "italic"),
                                            text_color=COR_TEXTO_MUT)
@@ -707,13 +708,13 @@ class AppIMC(ctk.CTk):
         self.lbl_saude.pack(pady=2)
 
         self.lbl_barra = ctk.CTkLabel(self.frame_resultado, text="")
-        self.lbl_barra.pack(pady=8)
+        self.lbl_barra.pack(pady=4)
 
         self.btn_exportar = ctk.CTkButton(self.frame_resultado, text="Exportar PDF", font=("Arial", 13),
-                                          width=130, height=36, corner_radius=12,
+                                          width=130, height=32, corner_radius=12,
                                           fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
                                           command=self.exportar_pdf)
-        self.btn_exportar.pack(pady=(4, 16))
+        self.btn_exportar.pack(pady=(2, 10))
 
     def atualizar_label_calculo(self):
         if not self.perfil_atual_id:
@@ -1119,10 +1120,10 @@ class AppIMC(ctk.CTk):
     # ------------------------------------------------------------------
     def configurar_tela_historico(self):
         frame_filtro = ctk.CTkFrame(self.tab_historico, fg_color="transparent")
-        frame_filtro.pack(pady=(20, 0))
+        frame_filtro.pack(pady=(12, 0))
         ctk.CTkLabel(frame_filtro, text="Perfil:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
         self.combobox_historico_perfil = ctk.CTkComboBox(
-            frame_filtro, values=[], width=300, height=38, corner_radius=12,
+            frame_filtro, values=[], width=300, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
             state="readonly", command=self._ao_escolher_perfil_no_historico)
         self.combobox_historico_perfil.pack(side="left")
@@ -1130,12 +1131,12 @@ class AppIMC(ctk.CTk):
         self.scroll_historico = ctk.CTkScrollableFrame(self.tab_historico, label_text="Medições do perfil ativo",
                                                        corner_radius=16, fg_color=("#FFFFFF", "#22262D"),
                                                        label_font=("Arial", 13, "bold"))
-        self.scroll_historico.pack(fill="both", expand=True, padx=16, pady=14)
+        self.scroll_historico.pack(fill="both", expand=True, padx=16, pady=10)
         self.btn_limpar_historico = ctk.CTkButton(self.tab_historico, text="Limpar histórico deste perfil",
-                                                  width=230, height=38, corner_radius=13,
+                                                  width=230, height=34, corner_radius=13,
                                                   fg_color="#D64545", hover_color="#B83838",
                                                   command=self.limpar_historico)
-        self.btn_limpar_historico.pack(pady=(0, 14))
+        self.btn_limpar_historico.pack(pady=(0, 10))
 
     def atualizar_lista_historico(self):
         for widget in self.scroll_historico.winfo_children():
@@ -1174,25 +1175,25 @@ class AppIMC(ctk.CTk):
     # ------------------------------------------------------------------
     def configurar_tela_evolucao(self):
         frame_filtro = ctk.CTkFrame(self.tab_evolucao, fg_color="transparent")
-        frame_filtro.pack(pady=(20, 0))
+        frame_filtro.pack(pady=(12, 0))
         ctk.CTkLabel(frame_filtro, text="Perfil:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
         self.combobox_evolucao_perfil = ctk.CTkComboBox(
-            frame_filtro, values=[], width=300, height=38, corner_radius=12,
+            frame_filtro, values=[], width=300, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
             state="readonly", command=self._ao_escolher_perfil_na_evolucao)
         self.combobox_evolucao_perfil.pack(side="left")
 
         self.lbl_evolucao_titulo = ctk.CTkLabel(self.tab_evolucao, text="Evolução do IMC",
-                                                font=("Arial", 18, "bold"))
-        self.lbl_evolucao_titulo.pack(pady=14)
+                                                font=("Arial", 17, "bold"))
+        self.lbl_evolucao_titulo.pack(pady=10)
         self.lbl_evolucao_img = ctk.CTkLabel(self.tab_evolucao, text="")
-        self.lbl_evolucao_img.pack(padx=10, pady=4)
+        self.lbl_evolucao_img.pack(padx=10, pady=2)
 
         self.btn_exportar_grafico = ctk.CTkButton(self.tab_evolucao, text="Exportar gráfico (PDF)",
-                                                  font=("Arial", 13), width=220, height=38, corner_radius=13,
+                                                  font=("Arial", 13), width=220, height=34, corner_radius=13,
                                                   fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                                   command=self.exportar_grafico)
-        self.btn_exportar_grafico.pack(pady=(0, 14))
+        self.btn_exportar_grafico.pack(pady=(0, 10))
 
     def exportar_grafico(self):
         png = getattr(self, "_imagem_grafico_png", None)
@@ -1239,37 +1240,37 @@ class AppIMC(ctk.CTk):
     # ------------------------------------------------------------------
     def configurar_tela_meta(self):
         frame_meta = ctk.CTkFrame(self.tab_meta, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        frame_meta.pack(pady=24, padx=(180, 180), fill="both", expand=True)
+        frame_meta.pack(pady=14, padx=(180, 180), fill="both", expand=True)
 
         self.lbl_meta_titulo = ctk.CTkLabel(frame_meta, text="Meta de Peso", font=("Arial", 20, "bold"))
-        self.lbl_meta_titulo.pack(pady=(26, 14))
+        self.lbl_meta_titulo.pack(pady=(20, 10))
 
         frame_meta_perfil = ctk.CTkFrame(frame_meta, fg_color="transparent")
-        frame_meta_perfil.pack(pady=6)
+        frame_meta_perfil.pack(pady=4)
         ctk.CTkLabel(frame_meta_perfil, text="Perfil:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
         self.combobox_meta_perfil = ctk.CTkComboBox(
-            frame_meta_perfil, values=[], width=300, height=38, corner_radius=12,
+            frame_meta_perfil, values=[], width=300, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
             state="readonly", command=self._ao_escolher_perfil_na_meta)
         self.combobox_meta_perfil.pack(side="left")
 
         self.lbl_meta_perfil = ctk.CTkLabel(frame_meta, text="", font=("Arial", 13))
-        self.lbl_meta_perfil.pack(pady=6)
+        self.lbl_meta_perfil.pack(pady=4)
 
-        ctk.CTkLabel(frame_meta, text="Peso meta (kg):", font=("Arial", 13)).pack(pady=10)
-        self.entry_meta = ctk.CTkEntry(frame_meta, width=180, height=40, corner_radius=12,
+        ctk.CTkLabel(frame_meta, text="Peso meta (kg):", font=("Arial", 13)).pack(pady=8)
+        self.entry_meta = ctk.CTkEntry(frame_meta, width=180, height=36, corner_radius=12,
                                        border_color=("#C8CDD2", "#3A424D"),
                                        placeholder_text="Ex: 72")
-        self.entry_meta.pack(pady=6)
+        self.entry_meta.pack(pady=4)
 
-        self.btn_meta = ctk.CTkButton(frame_meta, text="Definir Meta", width=180, height=40, corner_radius=14,
+        self.btn_meta = ctk.CTkButton(frame_meta, text="Definir Meta", width=180, height=36, corner_radius=14,
                                       font=("Arial", 14, "bold"),
                                       fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                       command=self.definir_meta)
-        self.btn_meta.pack(pady=14)
+        self.btn_meta.pack(pady=10)
 
         self.lbl_meta_status = ctk.CTkLabel(frame_meta, text="", font=("Arial", 13, "italic"))
-        self.lbl_meta_status.pack(pady=8)
+        self.lbl_meta_status.pack(pady=6)
 
     def _ao_escolher_perfil_na_meta(self, selecionado):
         self._ao_escolher_perfil_no_calculo(selecionado)
