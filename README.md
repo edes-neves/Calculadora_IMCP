@@ -58,6 +58,11 @@ ou falha de rede, o app informa a URL para baixar manualmente.
 3. Crie uma **Release** no GitHub com a tag `v1.2.0` (a versão deve ser **maior**
    que a constante do app) e **anexe o AppImage** como asset da release.
 
+> Automatize tudo com o `github.sh`: `./github.sh 1.2.0` atualiza a versão,
+> roda os testes, gera o executável e o AppImage, faz commit + push e publica a
+> Release `v1.2.0` com o AppImage anexado. Opções: `--skip-build`,
+> `--skip-package` e `--skip-tests`. Veja `./github.sh --help`.
+
 ## Logs e tratamento de erros
 
 - Exceções não capturadas são registradas em `logs/app_<data>.log` (não versionados no Git) com data/hora e stack trace, e uma janela amigável é exibida.
@@ -141,6 +146,7 @@ em `dist/CalculadoraIMC`.
 | `test_atualizador.py` | Testes de versões e escolha de asset do atualizador          |
 | `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
 | `build.sh`         | Script de build do executável                                  |
+| `github.sh`        | Script de publicação: bump de versão, build, push e Release    |
 | `CalculadoraIMC.desktop` | Atalho do AppImage (com `StartupWMClass`)                |
 | `AppRun`            | Ponto de entrada do AppImage (executa o binário)               |
 | `icone.png`        | Ícone da aplicação                                             |
