@@ -24,9 +24,10 @@ relatorios/
 build/
 dist/
 
-# Estrutura do AppImage (o .AppImage final é versionado para release)
+# Estrutura do AppImage (o .AppImage final é publicado na GitHub Release)
 AppDir/
 appimagetool
+*.AppImage
 
 # Artefatos IDEs
 .vscode/
