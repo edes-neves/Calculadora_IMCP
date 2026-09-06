@@ -12,6 +12,7 @@ venv/
 # Backup e configuração SMTP (contém credenciais)
 backups/
 config_smtp.json
+atualizacao.json
 
 # Logs
 logs/

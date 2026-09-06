@@ -23,6 +23,7 @@ exportação de relatório em PDF.
 - **Menus e atalhos**: barra de menus com **Arquivo** (exportar/PDF, configurações, sair), **Editar** (novo/editar/excluir perfil), **Exibir** (tema), **Históricos** e **Ajuda**.
 - **Ajuda por e-mail**: menu **Ajuda → Relatar um problema / Enviar uma sugestão / Contato** abre o cliente de e-mail pré-preenchido; **Sobre** mostra versão, desenvolvedor e licença MIT.
 - **Backup**: ao fechar o app, ele pergunta se você deseja criar um backup compactado (.zip) do banco na pasta `backups/` (roteação automática das últimas 10 cópias).
+- **Atualização automática**: ao iniciar, o app consulta as **releases no GitHub**; se houver versão mais nova, avisa com as notas da atualização e permite **baixar e aplicar com um clique** (disponível na versão executável; ver seção abaixo).
 - **Envio por e-mail (opcional)**: é possível configurar SMTP no menu Arquivo → Configurações para receber o backup por e-mail. A senha fica salva **cifrada** em `config_smtp.json` (fora do Git). Deixe os campos vazios para desativar.
 
 ## Configuração do envio por e-mail
@@ -33,6 +34,29 @@ exportação de relatório em PDF.
 4. Ao fechar o app e confirmar o backup, o .zip é enviado para o e-mail configurado (além de salvo localmente).
 
 > Dica (Gmail): gere uma "Senha de aplicativo" em Conta Google → Segurança, e use a porta 587 com STARTTLS.
+
+## Atualização automática (GitHub Releases)
+
+Na versão executável (AppImage ou binário PyInstaller), o app verifica no
+GitHub se existe uma release mais nova que a versão instalada:
+
+1. **Ao iniciar**, a verificação acontece em segundo plano (sem travar a UI).
+2. Se houver versão nova, uma janela mostra **o que há de novo** com os botões:
+   **Atualizar agora** (baixa e aplica na hora, reiniciando o app), **Agora não**
+   (pergunta de novo no próximo início) e **Pular esta versão** (não oferece mais
+   aquela versão).
+3. Também é possível verificar manualmente pelo menu **Ajuda → Verificar atualizações**.
+
+O download ocorre com barra de progresso e novo binário substitui o executável
+atual automaticamente. Em caso de permissão (ex.: AppImage em pasta sem escrita)
+ou falha de rede, o app informa a URL para baixar manualmente.
+
+**Como publicar uma nova versão** (para que os usuários recebam a atualização):
+
+1. Atualize a constante `VERSAO_ATUAL` em `atualizador.py` (ex.: `1.2.0`).
+2. Gere o executável/AppImage (`./build.sh` + AppImage).
+3. Crie uma **Release** no GitHub com a tag `v1.2.0` (a versão deve ser **maior**
+   que a constante do app) e **anexe o AppImage** como asset da release.
 
 ## Logs e tratamento de erros
 
@@ -75,6 +99,9 @@ python -m unittest test_logger -v
 # Testes da configuração SMTP (senha cifrada em repouso)
 python -m unittest test_config -v
 
+# Testes do verificador de atualizações (versões e assets do GitHub)
+python -m unittest test_atualizador -v
+
 # Rodar todos os testes
 python -m unittest discover -v
 ```
@@ -104,12 +131,14 @@ em `dist/CalculadoraIMC`.
 | `config.py`        | Persistência das configurações SMTP (`config_smtp.json`)       |
 | `logger.py`        | Logs em arquivo e exception hook global                        |
 | `caminhos.py`      | Resolução dos diretórios de dados (dev x AppImage)             |
+| `atualizador.py`   | Verificação/atualização automática via GitHub Releases          |
 | `test_database.py` | Testes unitários da camada de dados e cálculos                 |
 | `test_ui.py`       | Testes da interface (parsing, cálculo, PDF, dashboard, busca)  |
 | `test_backup.py`   | Testes do backup e da exportação CSV/JSON                      |
 | `test_nutricao.py` | Testes das equações de TMB/GET e sua persistência              |
 | `test_logger.py`   | Testes do logging e do tratamento de erros                     |
 | `test_config.py`   | Testes da configuração SMTP (senha cifrada em repouso)         |
+| `test_atualizador.py` | Testes de versões e escolha de asset do atualizador          |
 | `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
 | `build.sh`         | Script de build do executável                                  |
 | `CalculadoraIMC.desktop` | Atalho do AppImage (com `StartupWMClass`)                |

@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 import webbrowser
 from tkinter import Menu, messagebox
 from urllib.parse import quote
@@ -7,7 +8,9 @@ from urllib.parse import quote
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
+import atualizador
 import backup
+import caminhos
 import config
 import grafico
 import logger
@@ -85,6 +88,9 @@ class AppIMC(ctk.CTk):
             self.selecionar_perfil(self.perfis[0][0])
 
         self.protocol("WM_DELETE_WINDOW", self._ao_fechar)
+
+        # Verifica atualizações pouco depois da janela abrir (sem travar a UI).
+        self.after(1500, lambda: self._iniciar_verificacao_atualizacao(manual=False))
 
     def _ao_fechar(self):
         """Pergunta se deseja fazer o backup (local + e-mail se configurado) antes de sair."""
@@ -182,6 +188,9 @@ class AppIMC(ctk.CTk):
                                command=lambda: self._abrir_email("Sugestão - Calculadora de IMC"))
         menu_ajuda.add_command(label="Contato",
                                command=lambda: self._abrir_email("Contato - Calculadora de IMC"))
+        menu_ajuda.add_separator()
+        menu_ajuda.add_command(label="Verificar atualizações",
+                               command=lambda: self._iniciar_verificacao_atualizacao(manual=True))
         menu_ajuda.add_command(label="Sobre", command=self._sobre)
 
         self._menubar.add_cascade(label="Arquivo", menu=menu_arquivo)
@@ -244,6 +253,8 @@ class AppIMC(ctk.CTk):
                      font=("Arial", 15, "bold"), text_color=COR_PRIMARIA).pack(pady=4)
         ctk.CTkLabel(dialog, text=f"Contato: {EMAIL_SUPORTE}",
                      font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=2)
+        ctk.CTkLabel(dialog, text=f"Versão {atualizador.VERSAO_ATUAL}",
+                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=2)
 
         ctk.CTkFrame(dialog, height=2, corner_radius=1,
                      fg_color=COR_PRIMARIA).pack(fill="x", padx=40, pady=14)
@@ -266,6 +277,171 @@ class AppIMC(ctk.CTk):
         ctk.CTkButton(dialog, text="Fechar", width=120, height=38, corner_radius=14,
                       fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                       command=dialog.destroy).pack(pady=16)
+
+    # ------------------------------------------------------------------
+    # Atualização automática
+    # ------------------------------------------------------------------
+    def _iniciar_verificacao_atualizacao(self, manual=False):
+        """Consulta o GitHub por versões novas em thread, sem travar a UI."""
+        if not getattr(sys, "frozen", False):
+            if manual:
+                messagebox.showinfo(
+                    "Verificar atualizações",
+                    f"A verificação automática funciona apenas na versão executável "
+                    f"(AppImage/binário).\n\nVersão atual: {atualizador.VERSAO_ATUAL}")
+            return
+
+        def _trabalho():
+            try:
+                info = atualizador.checar_atualizacao()
+            except Exception:
+                logger.LOGGER.exception("Falha ao verificar atualizações")
+                return
+            try:
+                self.after(0, lambda: self._apresentar_atualizacao(info, manual))
+            except Exception:
+                pass
+
+        threading.Thread(target=_trabalho, daemon=True).start()
+
+    def _apresentar_atualizacao(self, info, manual=False):
+        if not info:
+            if manual:
+                messagebox.showinfo(
+                    "Verificar atualizações",
+                    "Você já está com a versão mais recente.\n\n"
+                    f"Versão atual: {atualizador.VERSAO_ATUAL}")
+            return
+        if not manual and atualizador.versao_pulada() == info["versao"]:
+            return
+        self._exibir_dialog_atualizacao(info)
+
+    def _exibir_dialog_atualizacao(self, info):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Atualização disponível")
+        dialog.geometry("560x400")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        dialog.lift()
+        dialog.focus_force()
+
+        ctk.CTkLabel(dialog, text=f"Nova versão {info['versao']} disponível",
+                     font=("Arial", 20, "bold"), text_color=COR_PRIMARIA).pack(pady=(22, 2))
+        ctk.CTkLabel(dialog, text=f"Você está usando a versão {atualizador.VERSAO_ATUAL}.",
+                     font=("Arial", 13), text_color=COR_TEXTO_MUT).pack(pady=(0, 10))
+
+        corpo = ctk.CTkFrame(dialog, fg_color="transparent")
+        corpo.pack(fill="both", expand=True, padx=24, pady=(0, 8))
+        ctk.CTkLabel(corpo, text="O que há de novo:",
+                     font=("Arial", 13, "bold"), anchor="w").pack(anchor="w")
+        notas = info["notas"] or "As notas desta versão não foram informadas."
+        caixa = ctk.CTkTextbox(corpo, corner_radius=12, height=150, wrap="word",
+                               fg_color=("#EDF1F4", "#2A2F37"))
+        caixa.pack(fill="both", expand=True, pady=(4, 4))
+        caixa.insert("1.0", notas)
+        caixa.configure(state="disabled")
+
+        ctk.CTkLabel(dialog, text="A atualização será baixada e aplicada no lugar do atual.",
+                     font=("Arial", 11), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
+
+        frame_btn = ctk.CTkFrame(dialog, fg_color="transparent")
+        frame_btn.pack(pady=(0, 16))
+        ctk.CTkButton(frame_btn, text="Atualizar agora", font=("Arial", 14, "bold"),
+                      width=160, height=40, corner_radius=14,
+                      fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
+                      command=lambda: self._iniciar_download_atualizacao(info, dialog)).pack(side="left", padx=6)
+        ctk.CTkButton(frame_btn, text="Agora não", font=("Arial", 13),
+                      width=120, height=40, corner_radius=14,
+                      fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
+                      command=dialog.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(frame_btn, text="Pular esta versão", font=("Arial", 13),
+                      width=150, height=40, corner_radius=14,
+                      fg_color=("#E2E8F0", "#3A4149"), hover_color=("#CBD5E1", "#49525C"),
+                      command=lambda: (atualizador.marcar_versao_pulada(info["versao"]),
+                                       dialog.destroy())).pack(side="left", padx=6)
+
+    def _iniciar_download_atualizacao(self, info, dialog_aviso):
+        try:
+            dialog_aviso.destroy()
+        except Exception:
+            pass
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Baixando atualização")
+        dlg.geometry("480x200")
+        dlg.transient(self)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+        dlg.lift()
+        dlg.focus_force()
+
+        ctk.CTkLabel(dlg, text=f"Baixando {info['nome']}",
+                     font=("Arial", 15, "bold")).pack(pady=(24, 4))
+        lbl_prog = ctk.CTkLabel(dlg, text="Preparando o download...",
+                                font=("Arial", 12), text_color=COR_TEXTO_MUT)
+        lbl_prog.pack(pady=(0, 6))
+        barra = ctk.CTkProgressBar(dlg, width=380, height=16, corner_radius=8,
+                                   progress_color=COR_PRIMARIA)
+        barra.pack(pady=(0, 4), padx=24)
+        barra.set(0)
+
+        destino = os.path.join(atualizador.pasta_downloads(), info["nome"])
+
+        def _progresso(baixado, total):
+            def _ui():
+                if not dlg.winfo_exists():
+                    return
+                if total:
+                    barra.set(min(baixado / total, 1.0))
+                    lbl_prog.configure(
+                        text=f"{baixado / 1048576:.1f} MB de {total / 1048576:.1f} MB")
+                else:
+                    lbl_prog.configure(text=f"{baixado / 1048576:.1f} MB baixados")
+            try:
+                dlg.after(0, _ui)
+            except Exception:
+                pass
+
+        def _trabalho():
+            try:
+                baixado = atualizador.baixar_arquivo(info["url"], destino, _progresso)
+                alvo = atualizador.aplicar_atualizacao(baixado)
+                resultado = ("ok", alvo)
+            except Exception as exc:
+                logger.LOGGER.exception("Falha na atualização")
+                resultado = ("erro", exc)
+            try:
+                dlg.after(0, lambda: self._concluir_atualizacao(resultado, dlg))
+            except Exception:
+                pass
+
+        threading.Thread(target=_trabalho, daemon=True).start()
+
+    def _concluir_atualizacao(self, resultado, dlg):
+        try:
+            if dlg.winfo_exists():
+                dlg.destroy()
+        except Exception:
+            pass
+
+        if resultado[0] == "ok":
+            alvo = resultado[1]
+            try:
+                atualizador.reiniciar(alvo)
+            except Exception as exc:
+                logger.LOGGER.warning("Falha ao reiniciar: %s", exc)
+            messagebox.showinfo(
+                "Atualização concluída",
+                "A nova versão foi aplicada com sucesso.\n\n"
+                "O aplicativo está sendo reiniciado com a versão mais recente.")
+            self.destroy()
+        else:
+            messagebox.showerror(
+                "Falha na atualização",
+                "Não foi possível aplicar a atualização automaticamente.\n\n"
+                f"Detalhes: {resultado[1]}\n\n"
+                f"Você pode baixar manualmente em:\n{atualizador.URL_RELEASES}")
 
     # ------------------------------------------------------------------
     # Tela de Perfil
