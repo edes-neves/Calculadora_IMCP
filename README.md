@@ -13,20 +13,24 @@ exportação de relatório em PDF.
 - **Cálculo do IMC**: seletor de perfil na própria aba (ordenado por cadastro), indicador visual em barra de faixas coloridas (OMS/SBGG) e faixa de peso ideal.
 - **Validação de entrada**: limites realistas para peso, altura e idade; aceita vírgula como separador decimal; atalho para entrada em centímetros.
 - **Composição corporal**: campos opcionais de cintura e quadril para estimar a % de gordura corporal (fórmula de Deurenberg), o RCQ e o risco cardiovascular pela circunferência da cintura (OMS).
-- **Histórico**: todas as medições por paciente, com opção de limpar.
-- **Evolução**: gráfico de linha com a trajetória do IMC ao longo do tempo.
+- **Gasto energético (TMB e GET)**: calcula a Taxa Metabólica Basal pelas equações de **Mifflin-St Jeor** e **Harris-Benedict** e o Gasto Energético Total pela aplicação do **fator de atividade** (sedentário a atleta). Disponível para pacientes adultos (18+). Os valores são exibidos na tela de cálculo, salvos no histórico, exportados (CSV/JSON) e incluídos no relatório PDF.
+- **Histórico**: todas as medições por paciente, com seletor de perfil e opção de limpar.
+- **Evolução**: gráfico de linha com a trajetória do IMC ao longo do tempo, com seletor de perfil e exportação do gráfico em PDF.
 - **Meta de peso**: define uma meta por paciente e mostra a distância até ela.
 - **Exportar PDF**: relatório profissional com os dados da medição, composição corporal e recomendação personalizada.
 - **Exportar dados**: exporta todos os perfis e medições em **CSV** ou **JSON** (menu Arquivo).
-- **Backup automático**: ao fechar o app, um backup compactado (.zip) do banco é salvo na pasta `backups/` (roteação automática das últimas 10 cópias).
-- **Envio por e-mail (opcional)**: é possível configurar SMTP no menu Arquivo → Configurações para receber o backup por e-mail. As credenciais ficam salvas em `config_smtp.json` (fora do Git). Deixe os campos vazios para desativar.
+- **Tema claro/escuro**: alternância rápida pelo botão no topo ou pelo menu **Exibir → Alternar tema**.
+- **Menus e atalhos**: barra de menus com **Arquivo** (exportar/PDF, configurações, sair), **Editar** (novo/editar/excluir perfil), **Exibir** (tema), **Históricos** e **Ajuda**.
+- **Ajuda por e-mail**: menu **Ajuda → Relatar um problema / Enviar uma sugestão / Contato** abre o cliente de e-mail pré-preenchido; **Sobre** mostra versão, desenvolvedor e licença MIT.
+- **Backup**: ao fechar o app, ele pergunta se você deseja criar um backup compactado (.zip) do banco na pasta `backups/` (roteação automática das últimas 10 cópias).
+- **Envio por e-mail (opcional)**: é possível configurar SMTP no menu Arquivo → Configurações para receber o backup por e-mail. A senha fica salva **cifrada** em `config_smtp.json` (fora do Git). Deixe os campos vazios para desativar.
 
 ## Configuração do envio por e-mail
 
 1. No menu **Arquivo → Configurações**, preencha servidor SMTP, porta, usuário, senha de aplicativo e destinatário.
 2. Marque **"Ativar envio automático"** (e **STARTTLS** se o servidor usar, como o Gmail na porta 587).
 3. Clique em **Testar envio** para validar antes de usar.
-4. Ao fechar o app, o backup .zip é enviado para o e-mail configurado (além de salvo localmente).
+4. Ao fechar o app e confirmar o backup, o .zip é enviado para o e-mail configurado (além de salvo localmente).
 
 > Dica (Gmail): gere uma "Senha de aplicativo" em Conta Google → Segurança, e use a porta 587 com STARTTLS.
 
@@ -53,11 +57,23 @@ python main.py
 ## Como testar
 
 ```bash
-# Testes da camada de dados e dos cálculos
+# Testes da camada de dados e cálculos (perfis, IMC, composição corporal, TMB/GET)
 python -m unittest test_database -v
 
-# Testes de interface (parsing de entrada, fluxo de cálculo e PDFs)
+# Testes de interface (parsing de entrada, fluxo de cálculo, PDF, dashboard, busca)
 python -m unittest test_ui -v
+
+# Testes de backup (local, rotação e exportação CSV/JSON)
+python -m unittest test_backup -v
+
+# Testes das equações nutricionais (TMB/GET) e da persistência delas
+python -m unittest test_nutricao -v
+
+# Testes de logging e tratamento de erros
+python -m unittest test_logger -v
+
+# Testes da configuração SMTP (senha cifrada em repouso)
+python -m unittest test_config -v
 
 # Rodar todos os testes
 python -m unittest discover -v
@@ -83,6 +99,7 @@ em `dist/CalculadoraIMC`.
 | `database.py`      | Camada de dados SQLite (perfis, histórico, cálculos e regras)  |
 | `grafico.py`       | Geração das imagens (barra de faixas e gráfico de evolução)    |
 | `relatorio.py`     | Geração do relatório em PDF (ReportLab)                        |
+| `nutricao.py`      | Cálculos nutricionais: TMB (Mifflin/Harris) e GET (fator ativ.)|
 | `backup.py`        | Backup .zip local, rotação e envio por e-mail (SMTP)           |
 | `config.py`        | Persistência das configurações SMTP (`config_smtp.json`)       |
 | `logger.py`        | Logs em arquivo e exception hook global                        |
@@ -90,7 +107,9 @@ em `dist/CalculadoraIMC`.
 | `test_database.py` | Testes unitários da camada de dados e cálculos                 |
 | `test_ui.py`       | Testes da interface (parsing, cálculo, PDF, dashboard, busca)  |
 | `test_backup.py`   | Testes do backup e da exportação CSV/JSON                      |
+| `test_nutricao.py` | Testes das equações de TMB/GET e sua persistência              |
 | `test_logger.py`   | Testes do logging e do tratamento de erros                     |
+| `test_config.py`   | Testes da configuração SMTP (senha cifrada em repouso)         |
 | `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
 | `build.sh`         | Script de build do executável                                  |
 | `CalculadoraIMC.desktop` | Atalho do AppImage (com `StartupWMClass`)                |
@@ -126,8 +145,13 @@ cp AppRun AppDir/          # AppRun obrigatório (executa o binário)
 
 # 4. Empacotar
 ./appimagetool AppDir
-# gera: Calculadora_de_IMC_Profissional-1.0.0-x86_64.AppImage
+# gera: Calculadora_de_IMC_Profissional-x86_64.AppImage
 ```
+
+> Importante: copie o binário **novo** (`cp dist/CalculadoraIMC AppDir/usr/bin/`) antes
+> de cada empacotamento. Se o AppDir mantiver um binário antigo, o AppImage será
+> gerado sem as mudanças mais recentes do código. Para garantir, refaça o build
+> (passo 1) antes do passo 3.
 
 O `AppRun` é o ponto de entrada do AppImage e executa o binário PyInstaller:
 

@@ -11,6 +11,7 @@ import backup
 import config
 import grafico
 import logger
+import nutricao
 import relatorio
 from database import Database, LIMITES
 
@@ -86,16 +87,23 @@ class AppIMC(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._ao_fechar)
 
     def _ao_fechar(self):
-        """Executa o backup automático (local + e-mail se configurado) antes de sair."""
+        """Pergunta se deseja fazer o backup (local + e-mail se configurado) antes de sair."""
         try:
-            zip_criado, email_ok, msg = backup.backup_completo(self._caminho_banco())
-            if zip_criado:
-                info = f"Backup automático salvo em:\n{zip_criado}"
-                logger.LOGGER.info("Backup criado: %s", zip_criado)
-                if config.configurado_para_email(config.carregar_config()):
-                    info += "\n\n" + msg
-                    logger.LOGGER.info("Backup por e-mail: %s", msg)
-                messagebox.showinfo("Backup realizado", info)
+            resposta = messagebox.askyesno(
+                "Confirmar saída",
+                "Deseja fazer um backup dos dados antes de fechar o app?")
+            if resposta:
+                zip_criado, email_ok, msg = backup.backup_completo(self._caminho_banco())
+                if zip_criado:
+                    info = f"Backup salvo em:\n{zip_criado}"
+                    logger.LOGGER.info("Backup criado: %s", zip_criado)
+                    if config.configurado_para_email(config.carregar_config()):
+                        info += "\n\n" + msg
+                        logger.LOGGER.info("Backup por e-mail: %s", msg)
+                    messagebox.showinfo("Backup realizado", info)
+                else:
+                    messagebox.showwarning(
+                        "Backup", "Não foi possível criar o backup do banco de dados.")
         except Exception:
             logger.LOGGER.exception("Falha no backup automático")
         finally:
@@ -494,6 +502,8 @@ class AppIMC(ctk.CTk):
 
     def selecionar_perfil(self, perfil_id):
         self.perfil_atual_id = perfil_id
+        self._ultima_nutri = None
+        self._ocultar_tela_nutricional()
         p = self.db.buscar_perfil(perfil_id)
         if p:
             if not getattr(self, "_atualizando_combobox", False):
@@ -679,6 +689,39 @@ class AppIMC(ctk.CTk):
                                     command=self.converter_cm_para_m)
         self.btn_cm.grid(row=5, column=2, padx=(6, 20), pady=(0, 6))
 
+        # --- Planejamento nutricional (opcional): TMB e GET ---
+        frame_nutri = ctk.CTkFrame(self.tab_calculo, corner_radius=18,
+                                   fg_color=("#EAF4F1", "#20262D"))
+        frame_nutri.pack(pady=(0, 8), padx=(60, 60), fill="x")
+
+        linha_top = ctk.CTkFrame(frame_nutri, fg_color="transparent")
+        linha_top.pack(fill="x", padx=16, pady=(10, 2))
+        ctk.CTkLabel(linha_top, text="Planejamento nutricional (TMB e GET)",
+                     font=("Arial", 14, "bold"), text_color=COR_PRIMARIA).pack(side="left")
+        self.lbl_nutri_aviso = ctk.CTkLabel(
+            linha_top, text="", font=("Arial", 11, "italic"), text_color=COR_TEXTO_MUT)
+        self.lbl_nutri_aviso.pack(side="right")
+
+        linha_form = ctk.CTkFrame(frame_nutri, fg_color="transparent")
+        linha_form.pack(fill="x", padx=16, pady=(2, 10))
+        ctk.CTkLabel(linha_form, text="Nível de atividade física:",
+                     font=("Arial", 12)).pack(side="left")
+        self.combobox_atividade = ctk.CTkComboBox(
+            linha_form, width=320, height=30, corner_radius=10,
+            border_color=("#C8CDD2", "#3A424D"),
+            values=[r for _, r, _ in nutricao.ATIVIDADES])
+        self.combobox_atividade.set(nutricao.ATIVIDADES[0][1])
+        self.combobox_atividade.pack(side="left", padx=(8, 24))
+
+        ctk.CTkLabel(linha_form, text="Método da TMB:",
+                     font=("Arial", 12)).pack(side="left")
+        self.combobox_metodo_tmb = ctk.CTkComboBox(
+            linha_form, width=140, height=30, corner_radius=10,
+            border_color=("#C8CDD2", "#3A424D"),
+            values=["Mifflin-St Jeor", "Harris-Benedict"])
+        self.combobox_metodo_tmb.set("Mifflin-St Jeor")
+        self.combobox_metodo_tmb.pack(side="left", padx=(8, 0))
+
         self.lbl_limites = ctk.CTkLabel(frame_inputs,
                                         text=f"Limites aceitos: peso {LIMITES['peso_min']}-{LIMITES['peso_max']}kg, "
                                              f"altura {LIMITES['altura_min']}-{LIMITES['altura_max']}m, "
@@ -690,32 +733,45 @@ class AppIMC(ctk.CTk):
                                           height=46, width=300, corner_radius=16,
                                           fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                           command=self.processar_calculo)
-        self.btn_calcular.pack(pady=(10, 6))
+        self.btn_calcular.pack(pady=(6, 6))
 
-        self.frame_resultado = ctk.CTkFrame(self.tab_calculo, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
-        self.frame_resultado.pack(pady=8, padx=(60, 60), fill="both")
+        self.frame_resultado = ctk.CTkScrollableFrame(self.tab_calculo, corner_radius=18,
+                                                      fg_color=("#FFFFFF", "#22262D"),
+                                                      label_text="")
+        self.frame_resultado.pack(pady=(0, 8), padx=(60, 60), fill="both", expand=True)
 
         self.lbl_resultado_imc = ctk.CTkLabel(self.frame_resultado, text="---", font=("Arial", 34, "bold"))
-        self.lbl_resultado_imc.pack(pady=(10, 2))
+        self.lbl_resultado_imc.pack(pady=(12, 2))
         self.lbl_classificacao = ctk.CTkLabel(self.frame_resultado, text="Selecione um perfil e preencha os dados",
                                               font=("Arial", 16, "bold"))
         self.lbl_classificacao.pack(pady=2)
         self.lbl_peso_ideal = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 13, "italic"),
-                                           text_color=COR_TEXTO_MUT)
+                                           text_color=COR_TEXTO_MUT, wraplength=620, justify="center")
         self.lbl_peso_ideal.pack(pady=2)
 
         self.lbl_saude = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 12),
-                                      text_color=COR_INFO, wraplength=520, justify="center")
+                                      text_color=COR_INFO, wraplength=560, justify="center")
         self.lbl_saude.pack(pady=2)
 
         self.lbl_barra = ctk.CTkLabel(self.frame_resultado, text="")
         self.lbl_barra.pack(pady=4)
 
+        # Painel de TMB / GET (oculto até haver resultado nutricional)
+        self.frame_get = ctk.CTkFrame(self.frame_resultado, corner_radius=14,
+                                      fg_color=("#EAF4F1", "#232A32"))
+        self.lbl_get_titulo = ctk.CTkLabel(self.frame_get, text="Gasto Energético",
+                                           font=("Arial", 14, "bold"), text_color=COR_PRIMARIA)
+        self.lbl_get_titulo.pack(anchor="w", padx=14, pady=(8, 4))
+        self.lbl_get_result = ctk.CTkLabel(
+            self.frame_get, text="", font=("Arial", 13), justify="center",
+            wraplength=600, text_color=("#000000", "#E6E6E6"))
+        self.lbl_get_result.pack(padx=14, pady=(0, 8))
+
         self.btn_exportar = ctk.CTkButton(self.frame_resultado, text="Exportar PDF", font=("Arial", 13),
                                           width=130, height=32, corner_radius=12,
                                           fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
                                           command=self.exportar_pdf)
-        self.btn_exportar.pack(pady=(2, 10))
+        self.btn_exportar.pack(pady=(6, 12))
 
     def atualizar_label_calculo(self):
         if not self.perfil_atual_id:
@@ -760,6 +816,60 @@ class AppIMC(ctk.CTk):
     def _ler_medidas_corpo(self):
         return (self._ler_medida_cm(self.entry_cintura.get()),
                 self._ler_medida_cm(self.entry_quadril.get()))
+
+    # ---------- TMB / GET ----------
+    def _atividade_ativa(self):
+        """Retorna a chave (ex.: 'moderado') do nível de atividade selecionado."""
+        rotulo = self.combobox_atividade.get()
+        for chave, texto, _fator in nutricao.ATIVIDADES:
+            if rotulo == texto or texto.startswith(rotulo):
+                return chave
+        return nutricao.ATIVIDADES[0][0]
+
+    def _metodo_tmb_ativa(self):
+        """Retorna 'mifflin' ou 'harris' conforme combo."""
+        rotulo = self.combobox_metodo_tmb.get()
+        return "harris" if "Harris" in rotulo else "mifflin"
+
+    def _ocultar_tela_nutricional(self):
+        try:
+            self.frame_get.pack_forget()
+        except Exception:
+            pass
+        self.lbl_nutri_aviso.configure(text="")
+
+    def _atualizar_tela_nutricional(self):
+        """Exibe TMB (2 métodos) e GET calculados e salvos na última medição."""
+        nutri = getattr(self, "_ultima_nutri", None)
+        if not nutri:
+            self._ocultar_tela_nutricional()
+            return
+        tmb_miff, tmb_har, fator, metodo, get, data = nutri
+
+        if tmb_miff is None and tmb_har is None:
+            # Perfil sem faixa etária adulta -> TMB/GET não aplicáveis.
+            self._ocultar_tela_nutricional()
+            self.lbl_nutri_aviso.configure(
+                text="TMB/GET disponíveis apenas para pacientes com 18+ anos.")
+            return
+
+        # Monta texto compacto com os dois métodos e o GET calculado.
+        partes = []
+        if tmb_miff is not None:
+            partes.append(f"TMB (Mifflin-St Jeor): {tmb_miff:.0f} kcal/dia")
+        if tmb_har is not None:
+            partes.append(f"TMB (Harris-Benedict): {tmb_har:.0f} kcal/dia")
+        if fator and get is not None:
+            metodo_nome = "Mifflin-St Jeor" if metodo != "harris" else "Harris-Benedict"
+            partes.append(
+                f"GET ({metodo_nome} × fator {fator:.2f}): {get:.0f} kcal/dia")
+        elif get is None and fator:
+            partes.append("GET: selecione um fator de atividade para o cálculo.")
+
+        self.lbl_get_result.configure(text="  •  ".join(partes))
+        if not self.frame_get.winfo_ismapped():
+            # Insere o painel antes do botão de exportação para manter a ordem visual.
+            self.frame_get.pack(before=self.btn_exportar, fill="x", padx=14, pady=6)
 
     def _atualizar_label_saude(self, detalhe):
         if not detalhe:
@@ -806,9 +916,14 @@ class AppIMC(ctk.CTk):
 
         cintura, quadril = self._ler_medidas_corpo()
 
+        atividade = self._atividade_ativa()
+        metodo = self._metodo_tmb_ativa()
+        metodo_db = "harris" if metodo == "harris" else "mifflin"
+
         imc, classe = self.db.salvar_registro(
             self.perfil_atual_id, peso, altura, idade, genero,
-            cintura_cm=cintura, quadril_cm=quadril)
+            cintura_cm=cintura, quadril_cm=quadril,
+            atividade=atividade, metodo_tmb=metodo_db)
         p_min, p_max = self.db.calcular_peso_ideal(altura, idade)
 
         cor_texto = self._cor_para_classificacao(classe)
@@ -816,6 +931,7 @@ class AppIMC(ctk.CTk):
 
         detalhe = self.db.buscar_ultima_medicao_detalhada(self.perfil_atual_id)
         self._ultima_saude = detalhe
+        self._ultima_nutri = self.db.buscar_ultimo_nutricional(self.perfil_atual_id)
 
         self.lbl_resultado_imc.configure(text=f"IMC: {imc}", text_color=cor_texto)
         self.lbl_classificacao.configure(text=classe, text_color=cor_texto)
@@ -823,6 +939,7 @@ class AppIMC(ctk.CTk):
             text=f"Para esta altura, a faixa de peso recomendada é de {p_min:.1f}kg a {p_max:.1f}kg.",
             text_color=COR_TEXTO_MUT)
         self._atualizar_label_saude(detalhe)
+        self._atualizar_tela_nutricional()
 
         try:
             barras_png = grafico.gerar_barra_imc(imc, idade)
@@ -842,6 +959,8 @@ class AppIMC(ctk.CTk):
         self.lbl_peso_ideal.configure(text="")
         self.lbl_saude.configure(text="")
         self.lbl_barra.configure(image="", text="")
+        self._ultima_nutri = None
+        self._ocultar_tela_nutricional()
 
     @staticmethod
     def _cor_para_classificacao(classe):
@@ -874,10 +993,11 @@ class AppIMC(ctk.CTk):
         perfil = self.db.buscar_perfil(self.perfil_atual_id)
         meta = perfil[4] if perfil else None
         saude = getattr(self, "_ultima_saude", None)
+        nutricional = getattr(self, "_ultima_nutri", None)
         try:
             relatorio.gerar_pdf_relatorio(
                 caminho, p[1], p[2], p[3], peso, altura, imc, classe, p_min, p_max,
-                cor, meta, saude=saude)
+                cor, meta, saude=saude, nutricional=nutricional)
             messagebox.showinfo("Exportar PDF", f"Relatório salvo em:\n{caminho}")
             logger.LOGGER.info("PDF exportado: %s", caminho)
         except Exception as e:
@@ -932,7 +1052,7 @@ class AppIMC(ctk.CTk):
 
         ctk.CTkLabel(scroll, text="Backup automático",
                      font=("Arial", 18, "bold")).pack(pady=(10, 4))
-        ctk.CTkLabel(scroll, text="Um backup .zip local é feito automaticamente ao fechar o app.",
+        ctk.CTkLabel(scroll, text="Ao fechar o app, será perguntado se deseja fazer um backup .zip local dos dados.",
                      font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
 
         est = ctk.CTkFrame(scroll, corner_radius=12, fg_color=("#EDF1F4", "#2A2F37"))

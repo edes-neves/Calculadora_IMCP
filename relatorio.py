@@ -56,12 +56,16 @@ def _gerar_recomendacao(classe, saude, p_min, p_max):
 
 
 def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
-                        p_min, p_max, cor="#333333", meta=None, data=None, saude=None):
+                        p_min, p_max, cor="#333333", meta=None, data=None, saude=None,
+                        nutricional=None):
     """Gera um PDF com o resultado da medição e salva no caminho informado.
 
     ``saude`` é opcional e deve ser uma tupla na ordem retornada por
     ``Database.buscar_ultima_medicao_detalhada``:
     (peso, altura, imc, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura).
+
+    ``nutricional`` é opcional e segue ``Database.buscar_ultimo_nutricional``:
+    (tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total, data_registro).
     """
     c = canvas.Canvas(caminho, pagesize=A4)
     largura, altura_pagina = A4
@@ -120,6 +124,20 @@ def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
             linhas.append(("Risco (circ. cintura)", risco))
         if linhas:
             bloco("Composição corporal", linhas)
+
+    # Bloco de gasto energético (TMB e GET) quando disponível
+    if nutricional:
+        tmb_miff, tmb_har, fator, metodo, _get_total, _data_nutri = nutricional
+        linhas = []
+        if tmb_miff is not None:
+            linhas.append(("TMB (Mifflin-St Jeor)", f"{tmb_miff:.0f} kcal/dia"))
+        if tmb_har is not None:
+            linhas.append(("TMB (Harris-Benedict)", f"{tmb_har:.0f} kcal/dia"))
+        if fator is not None and _get_total is not None:
+            linhas.append(("Fator de atividade", f"{fator:.2f}"))
+            linhas.append(("GET", f"{_get_total:.0f} kcal/dia"))
+        if linhas:
+            bloco("Gasto Energético", linhas)
 
     c.setFont("Helvetica-Bold", 12)
     c.setFillColor("#00B4D8")

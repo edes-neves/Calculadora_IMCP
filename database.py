@@ -85,6 +85,11 @@ class Database:
                 gordura_pct REAL,
                 rcq REAL,
                 risco_cintura TEXT,
+                tmb_mifflin REAL,
+                tmb_harris REAL,
+                fator_atividade REAL,
+                metodo_tmb TEXT,
+                get_total REAL,
                 FOREIGN KEY (perfil_id) REFERENCES perfil (id) ON DELETE CASCADE
             )
         """)
@@ -99,6 +104,11 @@ class Database:
             "gordura_pct": "REAL",
             "rcq": "REAL",
             "risco_cintura": "TEXT",
+            "tmb_mifflin": "REAL",
+            "tmb_harris": "REAL",
+            "fator_atividade": "REAL",
+            "metodo_tmb": "TEXT",
+            "get_total": "REAL",
         }
         for nome, tipo in novas.items():
             if nome not in colunas:
@@ -211,7 +221,13 @@ class Database:
         return LIMITES["idade_min"] <= idade <= LIMITES["idade_max"]
 
     def salvar_registro(self, perfil_id, peso, altura, idade, genero,
-                        cintura_cm=None, quadril_cm=None):
+                        cintura_cm=None, quadril_cm=None, atividade=None,
+                        metodo_tmb="mifflin"):
+        """Grava uma medição e também os cálculos nutricionais (TMB/GET) se aplicáveis.
+
+        ``atividade`` é a chave (ex.: "moderado") do fator de atividade e
+        ``metodo_tmb`` é "mifflin" ou "harris".
+        """
         imc = peso / (altura ** 2)
         classificacao = self.classificar_imc(imc, idade)
         gordura = self.calcular_gordura_corporal(imc, idade, genero) if idade > 0 else None
@@ -219,18 +235,34 @@ class Database:
         risco = self.classificar_risco_cintura(cintura_cm, genero)
         data_atual = datetime.now().strftime("%d/%m/%Y %H:%M")
 
+        tmb_mifflin = tmb_harris = get_total = None
+        fator_atividade = None
+        if idade >= 18:
+            from nutricao import (tmb_mifflin as _miff,
+                                  tmb_harris_benedict as _hb,
+                                  fator_atividade as _fator,
+                                  get_total as _get)
+            tmb_mifflin = _miff(peso, altura, idade, genero)
+            tmb_harris = _hb(peso, altura, idade, genero)
+            fator_atividade = _fator(atividade) if atividade else None
+            base = tmb_harris if metodo_tmb == "harris" else tmb_mifflin
+            if fator_atividade and base is not None:
+                get_total = _get(base, fator_atividade)
+
         with self.conectar() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO historico (
                     perfil_id, peso, altura, idade, genero, imc, classificacao, data_registro,
-                    cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura
+                    cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura,
+                    tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (perfil_id, peso, altura, idade, genero, round(imc, 2), classificacao, data_atual,
-                 cintura_cm, quadril_cm, gordura, rcq, risco),
+                 cintura_cm, quadril_cm, gordura, rcq, risco,
+                 tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total),
             )
             conn.commit()
 
@@ -317,6 +349,17 @@ class Database:
             )
             return cursor.fetchone()
 
+    def buscar_ultimo_nutricional(self, perfil_id):
+        """Retorna TMB (2 métodos), fator, método e GET da última medição (ou None)."""
+        with self.conectar() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total, data_registro "
+                "FROM historico WHERE perfil_id = ? ORDER BY id DESC LIMIT 1",
+                (perfil_id,),
+            )
+            return cursor.fetchone()
+
     # ---------- Exportação (CSV / JSON) ----------
     def coletar_dados_exportacao(self):
         """Coleta todos os perfis e seus registros para exportação."""
@@ -328,10 +371,13 @@ class Database:
 
             hist_cols = ["id", "perfil_id", "peso", "altura", "idade", "genero",
                          "imc", "classificacao", "data_registro", "cintura_cm",
-                         "quadril_cm", "gordura_pct", "rcq", "risco_cintura"]
+                         "quadril_cm", "gordura_pct", "rcq", "risco_cintura",
+                         "tmb_mifflin", "tmb_harris", "fator_atividade",
+                         "metodo_tmb", "get_total"]
             cursor.execute(
                 "SELECT id, perfil_id, peso, altura, idade, genero, imc, classificacao, "
-                "data_registro, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura "
+                "data_registro, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura, "
+                "tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total "
                 "FROM historico ORDER BY perfil_id, id")
             historico = [dict(zip(hist_cols, linha)) for linha in cursor.fetchall()]
             return {"perfis": perfis, "historico": historico}
