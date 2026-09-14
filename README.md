@@ -13,13 +13,15 @@ exportação de relatório em PDF.
 - **Cálculo do IMC**: seletor de perfil na própria aba (ordenado por cadastro), indicador visual em barra de faixas coloridas (OMS/SBGG) e faixa de peso ideal.
 - **Validação de entrada**: limites realistas para peso, altura e idade; aceita vírgula como separador decimal; atalho para entrada em centímetros.
 - **Composição corporal**: campos opcionais de cintura e quadril para estimar a % de gordura corporal (fórmula de Deurenberg), o RCQ e o risco cardiovascular pela circunferência da cintura (OMS).
+- **Pregas cutâneas (opcional)**: protocolo de **3 dobras de Jackson & Pollock** (peitoral, abdominal e coxa para homens; tricipital, suprailíaca e coxa para mulheres) com cálculo do % de gordura pela equação de **Siri**. O resultado é salvo no histórico e incluído no relatório PDF.
 - **Gasto energético (TMB e GET)**: calcula a Taxa Metabólica Basal pelas equações de **Mifflin-St Jeor** e **Harris-Benedict** e o Gasto Energético Total pela aplicação do **fator de atividade** (sedentário a atleta). Disponível para pacientes adultos (18+). Os valores são exibidos na tela de cálculo, salvos no histórico, exportados (CSV/JSON) e incluídos no relatório PDF.
-- **Histórico**: todas as medições por paciente, com seletor de perfil e opção de limpar.
+- **Histórico**: todas as medições por paciente, com seletor de perfil, exclusão de uma **medição individual** (com confirmação) e opção de limpar tudo.
 - **Evolução**: gráfico de linha com a trajetória do IMC ao longo do tempo, com seletor de perfil e exportação do gráfico em PDF.
 - **Meta de peso**: define uma meta por paciente e mostra a distância até ela.
 - **Exportar PDF**: relatório profissional com os dados da medição, composição corporal e recomendação personalizada.
 - **Exportar dados**: exporta todos os perfis e medições em **CSV** ou **JSON** (menu Arquivo).
-- **Tema claro/escuro**: alternância rápida pelo botão no topo ou pelo menu **Exibir → Alternar tema**.
+- **Tema claro/escuro**: alternância rápida pelo botão no topo ou pelo menu **Exibir → Alternar tema**. A escolha é **lembrada ao reabrir** o app (`preferencias.json`). No tema claro, todas as seções usam a mesma cor, com fontes escuras e em negrito para melhor leitura.
+- **Janela maximizada**: o app abre já preenchendo toda a área útil do monitor (a maximização pode ser feita pelo próprio sistema).
 - **Menus e atalhos**: barra de menus com **Arquivo** (exportar/PDF, configurações, sair), **Editar** (novo/editar/excluir perfil), **Exibir** (tema), **Históricos** e **Ajuda**.
 - **Ajuda por e-mail**: menu **Ajuda → Relatar um problema / Enviar uma sugestão / Contato** abre o cliente de e-mail pré-preenchido; **Sobre** mostra versão, desenvolvedor e licença MIT.
 - **Backup**: ao fechar o app, ele pergunta se você deseja criar um backup compactado (.zip) do banco na pasta `backups/` (roteação automática das últimas 10 cópias).
@@ -104,6 +106,9 @@ python -m unittest test_logger -v
 # Testes da configuração SMTP (senha cifrada em repouso)
 python -m unittest test_config -v
 
+# Testes das preferências do usuário (persistência do tema da UI)
+python -m unittest test_preferencias -v
+
 # Testes do verificador de atualizações (versões e assets do GitHub)
 python -m unittest test_atualizador -v
 
@@ -134,6 +139,7 @@ em `dist/CalculadoraIMC`.
 | `nutricao.py`      | Cálculos nutricionais: TMB (Mifflin/Harris) e GET (fator ativ.)|
 | `backup.py`        | Backup .zip local, rotação e envio por e-mail (SMTP)           |
 | `config.py`        | Persistência das configurações SMTP (`config_smtp.json`)       |
+| `preferencias.py`  | Preferências do usuário (`preferencias.json`: tema da UI)      |
 | `logger.py`        | Logs em arquivo e exception hook global                        |
 | `caminhos.py`      | Resolução dos diretórios de dados (dev x AppImage)             |
 | `atualizador.py`   | Verificação/atualização automática via GitHub Releases          |
@@ -143,6 +149,7 @@ em `dist/CalculadoraIMC`.
 | `test_nutricao.py` | Testes das equações de TMB/GET e sua persistência              |
 | `test_logger.py`   | Testes do logging e do tratamento de erros                     |
 | `test_config.py`   | Testes da configuração SMTP (senha cifrada em repouso)         |
+| `test_preferencias.py` | Testes da persistência de preferências (tema da UI)        |
 | `test_atualizador.py` | Testes de versões e escolha de asset do atualizador          |
 | `CalculadoraIMC.spec` | Configuração de build do PyInstaller                        |
 | `build.sh`         | Script de build do executável                                  |
@@ -215,6 +222,6 @@ StartupNotify=true
 ```
 
 > Em desenvolvimento, o app usa a pasta do projeto. No executável e no AppImage,
-> o banco, os logs, as configs SMTP e os backups são guardados em
+> o banco, os logs, as configs SMTP, as preferências e os backups são guardados em
 > `~/.local/share/CalculadoraIMC/` (persistente e gravável), nunca dentro do
 > pacote temporário.

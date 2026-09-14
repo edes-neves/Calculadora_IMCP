@@ -40,17 +40,15 @@ class TestBackup(unittest.TestCase):
         self.assertLessEqual(len(zips), backup.MAX_BACKUPS)
 
     def test_email_sem_configuracao_falha_graciosamente(self):
-        # garante arquivo inexistente
-        caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config_smtp.json")
-        if os.path.exists(caminho):
-            os.rename(caminho, caminho + ".bak")
+        # Aponta o app para um arquivo inexistente (sem tocar no config real).
+        original = config.CAMINHO_CONFIG
+        config.CAMINHO_CONFIG = os.path.join(self.tmpdir, "config_smtp.json")
         try:
             ok, msg = backup.enviar_email("a", "b")
             self.assertFalse(ok)
             self.assertIn("não configurado", msg.lower())
         finally:
-            if os.path.exists(caminho + ".bak"):
-                os.rename(caminho + ".bak", caminho)
+            config.CAMINHO_CONFIG = original
 
 
 class TestExportacao(unittest.TestCase):

@@ -95,6 +95,34 @@ class TestCalculoViaApp(unittest.TestCase):
         self._calcular("abc", "1.75")
         self.assertEqual(self.app.lbl_resultado_imc.cget("text"), "Erro")
 
+    def test_calcula_com_pregas(self):
+        if self.app.perfil_atual_id is None:
+            self.skipTest("banco sem perfis")
+        self.app.entry_peso.delete(0, "end")
+        self.app.entry_peso.insert(0, "80")
+        self.app.entry_altura.delete(0, "end")
+        self.app.entry_altura.insert(0, "1.80")
+        for entry in self.app._entries_pregas:
+            entry.delete(0, "end")
+            entry.insert(0, "15")
+        self.app.processar_calculo()
+        texto = self.app.lbl_pregas_result.cget("text")
+        self.assertIn("Gordura corporal (pregas)", texto)
+        self.assertIn("%", texto)
+
+    def test_pregas_incompletas_mostram_erro(self):
+        if self.app.perfil_atual_id is None:
+            self.skipTest("banco sem perfis")
+        self.app.entry_peso.delete(0, "end")
+        self.app.entry_peso.insert(0, "80")
+        self.app.entry_altura.delete(0, "end")
+        self.app.entry_altura.insert(0, "1.80")
+        # preenche só uma prega -> deve falhar a validação
+        self.app._entries_pregas[0].delete(0, "end")
+        self.app._entries_pregas[0].insert(0, "15")
+        self.app.processar_calculo()
+        self.assertEqual(self.app.lbl_resultado_imc.cget("text"), "Erro")
+
     def test_resultado_corresponde_ao_calculo_manual(self):
         texto, _ = self._calcular("80", "1.80")
         imc_esperado = 80 / (1.80 ** 2)

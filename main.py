@@ -15,6 +15,7 @@ import config
 import grafico
 import logger
 import nutricao
+import preferencias
 import relatorio
 from database import Database, LIMITES
 
@@ -24,8 +25,37 @@ COR_PERIGO = "#E74C3C"
 COR_AVISO = "#F39C12"
 COR_SUCESSO = "#27AE60"
 COR_INFO = "#3B9DFF"
-COR_TEXTO_MUT = "#8A8F98"
+COR_TEXTO_MUT = ("#3F4750", "#8A8F98")
 EMAIL_SUPORTE = "nevestecnologias@gmail.com"
+
+# Tons claros por seção no tema claro (pares: (tema claro, tema escuro))
+SEC_JANELA = ("#ECF1F6", "#1E2126")        # fundo da janela / abas
+SEC_LISTA = ("#979DA2", "#22262D")         # lista de pacientes
+SEC_DASH = ("#979DA2", "#22262D")          # visão geral
+SEC_CARD = ("#979DA2", "#2A2F37")          # cartões da visão geral
+SEC_FORM = ("#979DA2", "#22262D")          # formulário de perfil
+SEC_INPUTS = ("#979DA2", "#22262D")        # dados do cálculo
+SEC_PREGAS = ("#979DA2", "#20262D")        # pregas cutâneas
+SEC_NUTRICAO = ("#979DA2", "#20262D")      # planejamento nutricional
+SEC_RESULTADO = ("#979DA2", "#22262D")     # painel de resultado
+SEC_GET = ("#979DA2", "#232A32")           # painel gasto energético
+SEC_HIST = ("#979DA2", "#22262D")          # histórico
+SEC_CARD_HIST = ("#979DA2", "#2B3037")     # cartões do histórico
+SEC_META = ("#979DA2", "#22262D")          # meta de peso
+
+
+_PESOS_DESENHADOS = set()
+
+
+def _fonte(tamanho, estilo=""):
+    """Deixa todas as fontes em negrito quando o tema claro está ativo."""
+    pesoh = "bold" in estilo
+    base = ("Arial", tamanho, estilo) if estilo else ("Arial", tamanho)
+    if pesoh:
+        _PESOS_DESENHADOS.add(id(base))
+    if ctk.get_appearance_mode() == "Light" and not pesoh:
+        base = ("Arial", tamanho, "bold", "italic") if "italic" in estilo else ("Arial", tamanho, "bold")
+    return base
 
 
 class AppIMC(ctk.CTk):
@@ -33,7 +63,7 @@ class AppIMC(ctk.CTk):
         super().__init__(baseName="CalculadoraDeIMCProfissional",
                          className="CalculadoraDeIMCProfissional")
 
-        ctk.set_appearance_mode("Dark")
+        ctk.set_appearance_mode(preferencias.carregar()["ui_tema"] or "Dark")
         ctk.set_default_color_theme("green")
 
         self.db = Database()
@@ -46,6 +76,11 @@ class AppIMC(ctk.CTk):
         self.geometry("920x840")
         self.minsize(900, 820)
         self.resizable(True, True)
+        self.configure(fg_color=("#E6ECF3", "#16191D"))
+        try:
+            self.attributes("-zoomed", True)
+        except Exception:
+            pass
 
         self._configurar_icone()
 
@@ -63,7 +98,7 @@ class AppIMC(ctk.CTk):
             self,
             command=lambda: self._ao_trocar_aba(),
             corner_radius=18,
-            fg_color=("#FFFFFF", "#1E2126"),
+            fg_color=SEC_JANELA,
             segmented_button_fg_color=("#E8EDF0", "#2A2E34"),
             segmented_button_selected_color=COR_PRIMARIA,
             segmented_button_selected_hover_color=COR_PRIMARIA_HOVER,
@@ -123,12 +158,13 @@ class AppIMC(ctk.CTk):
         header.pack(fill="x", padx=20, pady=(16, 4))
 
         ctk.CTkLabel(header, text="Calculadora de IMC",
-                     font=("Arial", 24, "bold")).pack(side="left")
+                     font=_fonte(24, "bold")).pack(side="left")
         ctk.CTkLabel(header, text="Profissional",
-                     font=("Arial", 24, "bold"), text_color=COR_PRIMARIA).pack(side="left", padx=(6, 0))
+                     font=_fonte(24, "bold"), text_color=COR_PRIMARIA).pack(side="left", padx=(6, 0))
 
         self.btn_tema = ctk.CTkButton(
-            header, text="Modo Escuro", width=100, height=34, corner_radius=17,
+            header, text=("Modo Escuro" if ctk.get_appearance_mode() == "Dark" else "Modo Claro"),
+            width=100, height=34, corner_radius=17,
             fg_color=("#22262B", "#3A3F46"), hover_color=("#33383F", "#4A5058"),
             text_color=("#333333", "#E6E6E6"), command=self._alternar_tema)
         self.btn_tema.pack(side="right")
@@ -136,14 +172,65 @@ class AppIMC(ctk.CTk):
         texto_imc = ctk.CTkFrame(header, fg_color="transparent")
         texto_imc.pack(side="right", padx=(0, 24))
         ctk.CTkLabel(texto_imc, text="Índice de Massa Corporal",
-                     font=("Arial", 13), text_color=COR_TEXTO_MUT).pack(pady=(10, 0))
+                     font=_fonte(13), text_color=COR_TEXTO_MUT).pack(pady=(10, 0))
 
     def _alternar_tema(self):
         novo = "Light" if ctk.get_appearance_mode() == "Dark" else "Dark"
         ctk.set_appearance_mode(novo)
+        preferencias.salvar({"ui_tema": novo})
         self.btn_tema.configure(text="Modo Escuro" if novo == "Dark" else "Modo Claro")
         self.lbl_perfil_msg.configure(text=self.lbl_perfil_msg.cget("text"))
         self._ajustar_cores_menubar()
+        self._aplicar_fontes_por_tema()
+
+    def _aplicar_fontes_por_tema(self):
+        """Deixa todas as fontes em negrito no tema claro; no escuro, restaura as originais."""
+        tema_claro = ctk.get_appearance_mode() == "Light"
+        if not hasattr(self, "_fontes_originais"):
+            self._fontes_originais = {}
+
+        def _extrair(fonte):
+            if isinstance(fonte, tuple):
+                texto = " ".join(str(p) for p in fonte[2:]).lower()
+                return (fonte[0], fonte[1],
+                        "bold" if id(fonte) in _PESOS_DESENHADOS else "",
+                        "italic" if "italic" in texto else "")
+            try:
+                return (fonte.cget("family"), fonte.cget("size"),
+                        "bold" if fonte.cget("weight") == "bold" else "",
+                        "italic" if fonte.cget("slant") == "italic" else "")
+            except Exception:
+                return None
+
+        def _montar(orig, bold):
+            if not orig:
+                return None
+            familia, tamanho, peso, inclinacao = orig
+            if bold:
+                peso = "bold"
+            estilo = [p for p in (peso, inclinacao) if p]
+            return (familia, tamanho, *estilo)
+
+        def _percorrer(widget):
+            for filho in widget.winfo_children():
+                for atributo, parametro in (("_font", "font"),
+                                            ("_label_font", "label_font"),
+                                            ("_dropdown_font", "dropdown_font")):
+                    fonte = getattr(filho, atributo, None)
+                    if fonte is None:
+                        continue
+                    chave = (id(filho), atributo)
+                    if chave not in self._fontes_originais:
+                        self._fontes_originais[chave] = _extrair(fonte)
+                    nova = _montar(self._fontes_originais[chave], tema_claro)
+                    if nova:
+                        try:
+                            filho.configure(**{parametro: nova})
+                        except Exception:
+                            pass
+                _percorrer(filho)
+
+        _percorrer(self)
 
     # ------------------------------------------------------------------
     # Barra de menus
@@ -211,7 +298,7 @@ class AppIMC(ctk.CTk):
         ativo_fg = ("#FFFFFF" if escuro else "#111827")
         for menu in (self._menubar, *self._menus.values()):
             menu.configure(bg=bg, fg=fg, activebackground=ativo_bg, activeforeground=ativo_fg,
-                           bd=0, relief="flat", font=("Arial", 12))
+                           bd=0, relief="flat", font=_fonte(12))
 
     def _ir_para_aba(self, nome):
         self.abas.set(nome)
@@ -232,9 +319,9 @@ class AppIMC(ctk.CTk):
         dialog.focus_force()
 
         ctk.CTkLabel(dialog, text="Calculadora de IMC Profissional",
-                     font=("Arial", 22, "bold")).pack(pady=(24, 6))
+                     font=_fonte(22, "bold")).pack(pady=(24, 6))
         ctk.CTkLabel(dialog, text="Índice de Massa Corporal",
-                     font=("Arial", 14), text_color=COR_TEXTO_MUT).pack()
+                     font=_fonte(14), text_color=COR_TEXTO_MUT).pack()
 
         ctk.CTkFrame(dialog, height=2, corner_radius=1,
                      fg_color=COR_PRIMARIA).pack(fill="x", padx=40, pady=14)
@@ -246,22 +333,22 @@ class AppIMC(ctk.CTk):
             "acompanha a evolução por meio de gráficos, define metas de peso e gera "
             "relatórios em PDF."
         )
-        ctk.CTkLabel(dialog, text=descricao, font=("Arial", 14, "bold"),
+        ctk.CTkLabel(dialog, text=descricao, font=_fonte(14, "bold"),
                      wraplength=480, justify="center").pack(padx=32, pady=(4, 16))
 
         ctk.CTkLabel(dialog, text=f"Desenvolvedor: José Edes Neves",
-                     font=("Arial", 15, "bold"), text_color=COR_PRIMARIA).pack(pady=4)
+                     font=_fonte(15, "bold"), text_color=COR_PRIMARIA).pack(pady=4)
         ctk.CTkLabel(dialog, text=f"Contato: {EMAIL_SUPORTE}",
-                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=2)
+                     font=_fonte(12), text_color=COR_TEXTO_MUT).pack(pady=2)
         ctk.CTkLabel(dialog, text=f"Versão {atualizador.VERSAO_ATUAL}",
-                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=2)
+                     font=_fonte(12), text_color=COR_TEXTO_MUT).pack(pady=2)
 
         ctk.CTkFrame(dialog, height=2, corner_radius=1,
                      fg_color=COR_PRIMARIA).pack(fill="x", padx=40, pady=14)
 
         quadro_licenca = ctk.CTkFrame(dialog, corner_radius=14, fg_color=("#FFFFFF", "#22262D"))
         quadro_licenca.pack(fill="x", padx=32, pady=(0, 8))
-        ctk.CTkLabel(quadro_licenca, text="Licença MIT", font=("Arial", 16, "bold"),
+        ctk.CTkLabel(quadro_licenca, text="Licença MIT", font=_fonte(16, "bold"),
                      text_color=COR_AVISO).pack(pady=(12, 4))
         texto_licenca = (
             "Softwares distribuídos sob a licença MIT são livres e de código aberto. "
@@ -271,7 +358,7 @@ class AppIMC(ctk.CTk):
             "permissão em todas as cópias ou partes substanciais, e não haja garantia "
             "alguma sobre o programa."
         )
-        ctk.CTkLabel(quadro_licenca, text=texto_licenca, font=("Arial", 12),
+        ctk.CTkLabel(quadro_licenca, text=texto_licenca, font=_fonte(12),
                      wraplength=470, justify="center").pack(padx=16, pady=(2, 14))
 
         ctk.CTkButton(dialog, text="Fechar", width=120, height=38, corner_radius=14,
@@ -327,14 +414,14 @@ class AppIMC(ctk.CTk):
         dialog.focus_force()
 
         ctk.CTkLabel(dialog, text=f"Nova versão {info['versao']} disponível",
-                     font=("Arial", 20, "bold"), text_color=COR_PRIMARIA).pack(pady=(22, 2))
+                     font=_fonte(20, "bold"), text_color=COR_PRIMARIA).pack(pady=(22, 2))
         ctk.CTkLabel(dialog, text=f"Você está usando a versão {atualizador.VERSAO_ATUAL}.",
-                     font=("Arial", 13), text_color=COR_TEXTO_MUT).pack(pady=(0, 10))
+                     font=_fonte(13), text_color=COR_TEXTO_MUT).pack(pady=(0, 10))
 
         corpo = ctk.CTkFrame(dialog, fg_color="transparent")
         corpo.pack(fill="both", expand=True, padx=24, pady=(0, 8))
         ctk.CTkLabel(corpo, text="O que há de novo:",
-                     font=("Arial", 13, "bold"), anchor="w").pack(anchor="w")
+                     font=_fonte(13, "bold"), anchor="w").pack(anchor="w")
         notas = info["notas"] or "As notas desta versão não foram informadas."
         caixa = ctk.CTkTextbox(corpo, corner_radius=12, height=150, wrap="word",
                                fg_color=("#EDF1F4", "#2A2F37"))
@@ -343,19 +430,19 @@ class AppIMC(ctk.CTk):
         caixa.configure(state="disabled")
 
         ctk.CTkLabel(dialog, text="A atualização será baixada e aplicada no lugar do atual.",
-                     font=("Arial", 11), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
+                     font=_fonte(11), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
 
         frame_btn = ctk.CTkFrame(dialog, fg_color="transparent")
         frame_btn.pack(pady=(0, 16))
-        ctk.CTkButton(frame_btn, text="Atualizar agora", font=("Arial", 14, "bold"),
+        ctk.CTkButton(frame_btn, text="Atualizar agora", font=_fonte(14, "bold"),
                       width=160, height=40, corner_radius=14,
                       fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                       command=lambda: self._iniciar_download_atualizacao(info, dialog)).pack(side="left", padx=6)
-        ctk.CTkButton(frame_btn, text="Agora não", font=("Arial", 13),
+        ctk.CTkButton(frame_btn, text="Agora não", font=_fonte(13),
                       width=120, height=40, corner_radius=14,
                       fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
                       command=dialog.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(frame_btn, text="Pular esta versão", font=("Arial", 13),
+        ctk.CTkButton(frame_btn, text="Pular esta versão", font=_fonte(13),
                       width=150, height=40, corner_radius=14,
                       fg_color=("#E2E8F0", "#3A4149"), hover_color=("#CBD5E1", "#49525C"),
                       command=lambda: (atualizador.marcar_versao_pulada(info["versao"]),
@@ -377,9 +464,9 @@ class AppIMC(ctk.CTk):
         dlg.focus_force()
 
         ctk.CTkLabel(dlg, text=f"Baixando {info['nome']}",
-                     font=("Arial", 15, "bold")).pack(pady=(24, 4))
+                     font=_fonte(15, "bold")).pack(pady=(24, 4))
         lbl_prog = ctk.CTkLabel(dlg, text="Preparando o download...",
-                                font=("Arial", 12), text_color=COR_TEXTO_MUT)
+                                font=_fonte(12), text_color=COR_TEXTO_MUT)
         lbl_prog.pack(pady=(0, 6))
         barra = ctk.CTkProgressBar(dlg, width=380, height=16, corner_radius=8,
                                    progress_color=COR_PRIMARIA)
@@ -447,12 +534,12 @@ class AppIMC(ctk.CTk):
     # Tela de Perfil
     # ------------------------------------------------------------------
     def configurar_tela_perfil(self):
-        frame_lista = ctk.CTkFrame(self.tab_perfil, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_lista = ctk.CTkFrame(self.tab_perfil, corner_radius=18, fg_color=SEC_LISTA)
         frame_lista.pack(side="left", fill="both", expand=False, padx=(16, 8), pady=12, ipadx=30)
         frame_lista.configure(width=360)
 
         ctk.CTkLabel(frame_lista, text="Pacientes / Perfis",
-                     font=("Arial", 18, "bold")).pack(pady=(12, 6))
+                     font=_fonte(18, "bold")).pack(pady=(12, 6))
 
         self.entry_busca = ctk.CTkEntry(frame_lista, placeholder_text="Buscar paciente...",
                                         width=240, height=32, corner_radius=10,
@@ -481,28 +568,28 @@ class AppIMC(ctk.CTk):
         frame_direito = ctk.CTkFrame(self.tab_perfil, fg_color="transparent")
         frame_direito.pack(side="right", fill="both", expand=True, padx=(8, 16), pady=12)
 
-        frame_dash = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_dash = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=SEC_DASH)
         frame_dash.pack(side="top", fill="x", pady=(0, 8))
         self._configurar_dashboard(frame_dash)
 
-        frame_form = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_form = ctk.CTkFrame(frame_direito, corner_radius=18, fg_color=SEC_FORM)
         frame_form.pack(side="bottom", fill="y", expand=True)
-        self.lbl_form_titulo = ctk.CTkLabel(frame_form, text="Novo Perfil", font=("Arial", 18, "bold"))
+        self.lbl_form_titulo = ctk.CTkLabel(frame_form, text="Novo Perfil", font=_fonte(18, "bold"))
         self.lbl_form_titulo.pack(pady=(10, 8))
 
-        ctk.CTkLabel(frame_form, text="Nome:", font=("Arial", 13)).pack(anchor="w", padx=20)
+        ctk.CTkLabel(frame_form, text="Nome:", font=_fonte(13)).pack(anchor="w", padx=20)
         self.entry_nome = ctk.CTkEntry(frame_form, width=220, height=34, corner_radius=12,
                                        border_color=("#C8CDD2", "#3A424D"),
                                        placeholder_text="Nome do paciente")
         self.entry_nome.pack(padx=20, pady=(4, 6))
 
-        ctk.CTkLabel(frame_form, text="Idade:", font=("Arial", 13)).pack(anchor="w", padx=20)
+        ctk.CTkLabel(frame_form, text="Idade:", font=_fonte(13)).pack(anchor="w", padx=20)
         self.entry_nome_idade = ctk.CTkEntry(frame_form, width=220, height=34, corner_radius=12,
                                              border_color=("#C8CDD2", "#3A424D"),
                                              placeholder_text="Ex: 45")
         self.entry_nome_idade.pack(padx=20, pady=(4, 6))
 
-        ctk.CTkLabel(frame_form, text="Gênero:", font=("Arial", 13)).pack(anchor="w", padx=20)
+        ctk.CTkLabel(frame_form, text="Gênero:", font=_fonte(13)).pack(anchor="w", padx=20)
         self.combobox_perfil_genero = ctk.CTkComboBox(frame_form, values=["Masculino", "Feminino", "Outro"],
                                                       width=220, height=34, corner_radius=12,
                                                       border_color=("#C8CDD2", "#3A424D"))
@@ -526,16 +613,16 @@ class AppIMC(ctk.CTk):
         self._btn_criar_cor = self.btn_criar_perfil.cget("fg_color")
         self._perfil_em_edicao = None
 
-        self.lbl_perfil_msg = ctk.CTkLabel(frame_form, text="", font=("Arial", 12),
+        self.lbl_perfil_msg = ctk.CTkLabel(frame_form, text="", font=_fonte(12),
                                            text_color=COR_INFO, wraplength=240, justify="center")
         self.lbl_perfil_msg.pack(padx=16, pady=(0, 14))
 
     def _configurar_dashboard(self, frame):
-        ctk.CTkLabel(frame, text="Visão Geral", font=("Arial", 15, "bold")).pack(
+        ctk.CTkLabel(frame, text="Visão Geral", font=_fonte(15, "bold")).pack(
             anchor="w", padx=16, pady=(10, 6))
 
         self.dash_nome = ctk.CTkLabel(frame, text="Nenhum perfil selecionado",
-                                      font=("Arial", 14, "bold"), text_color=COR_PRIMARIA,
+                                      font=_fonte(14, "bold"), text_color=COR_PRIMARIA,
                                       anchor="w", wraplength=250, justify="left")
         self.dash_nome.pack(anchor="w", padx=16)
 
@@ -545,20 +632,20 @@ class AppIMC(ctk.CTk):
         cards = []
         for i, titulo in enumerate(("IMC", "Classificação", "Último peso", "Meta")):
             r, col = divmod(i, 2)
-            card = ctk.CTkFrame(grid, corner_radius=12, fg_color=("#F0F4F7", "#2A2F37"))
+            card = ctk.CTkFrame(grid, corner_radius=12, fg_color=SEC_CARD)
             card.grid(row=r, column=col, padx=5, pady=4, sticky="ew")
             grid.columnconfigure(col, weight=1)
-            ctk.CTkLabel(card, text=titulo, font=("Arial", 10), text_color=COR_TEXTO_MUT).pack(pady=(6, 0))
+            ctk.CTkLabel(card, text=titulo, font=_fonte(10), text_color=COR_TEXTO_MUT).pack(pady=(6, 0))
             cards.append(card)
 
-        self.dash_imc_val = ctk.CTkLabel(cards[0], text="--", font=("Arial", 12, "bold"))
-        self.dash_classe_val = ctk.CTkLabel(cards[1], text="", font=("Arial", 11, "bold"))
-        self.dash_peso_val = ctk.CTkLabel(cards[2], text="", font=("Arial", 11, "bold"))
-        self.dash_meta_val = ctk.CTkLabel(cards[3], text="", font=("Arial", 11, "bold"))
+        self.dash_imc_val = ctk.CTkLabel(cards[0], text="--", font=_fonte(12, "bold"))
+        self.dash_classe_val = ctk.CTkLabel(cards[1], text="", font=_fonte(11, "bold"))
+        self.dash_peso_val = ctk.CTkLabel(cards[2], text="", font=_fonte(11, "bold"))
+        self.dash_meta_val = ctk.CTkLabel(cards[3], text="", font=_fonte(11, "bold"))
         for lbl in (self.dash_imc_val, self.dash_classe_val, self.dash_peso_val, self.dash_meta_val):
             lbl.pack(pady=(0, 6))
 
-        self.dash_tendencia = ctk.CTkLabel(frame, text="", font=("Arial", 11),
+        self.dash_tendencia = ctk.CTkLabel(frame, text="", font=_fonte(11),
                                            text_color=COR_INFO, wraplength=250, justify="left")
         self.dash_tendencia.pack(anchor="w", padx=16, pady=(2, 8))
 
@@ -619,8 +706,9 @@ class AppIMC(ctk.CTk):
             btn = ctk.CTkButton(
                 self.lista_perfis,
                 text=texto,
-                font=("Arial", 13),
+                font=_fonte(13),
                 anchor="w",
+                text_color=("#333333", "#E6E6E6"),
                 fg_color=("#E9EEF2", "#2B3037"),
                 hover_color=("#D7E7F5", "#2E4B6B"),
                 corner_radius=12,
@@ -630,7 +718,7 @@ class AppIMC(ctk.CTk):
             btn.pack(fill="x", padx=9, pady=4)
         if not self.lista_perfis.winfo_children():
             ctk.CTkLabel(self.lista_perfis, text="Nenhum paciente encontrado.",
-                         font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=16)
+                         font=_fonte(12), text_color=COR_TEXTO_MUT).pack(pady=16)
 
     def carregar_perfis(self):
         self.perfis = self.db.listar_perfis()
@@ -679,7 +767,9 @@ class AppIMC(ctk.CTk):
     def selecionar_perfil(self, perfil_id):
         self.perfil_atual_id = perfil_id
         self._ultima_nutri = None
+        self._ultima_pregas = None
         self._ocultar_tela_nutricional()
+        self._atualizar_campos_pregas()
         p = self.db.buscar_perfil(perfil_id)
         if p:
             if not getattr(self, "_atualizando_combobox", False):
@@ -816,7 +906,7 @@ class AppIMC(ctk.CTk):
     def configurar_tela_calculo(self):
         frame_perfil_calculo = ctk.CTkFrame(self.tab_calculo, fg_color="transparent")
         frame_perfil_calculo.pack(pady=(14, 0))
-        ctk.CTkLabel(frame_perfil_calculo, text="Perfil:", font=("Arial", 14, "bold")).pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(frame_perfil_calculo, text="Perfil:", font=_fonte(14, "bold")).pack(side="left", padx=(0, 10))
         self.combobox_calculo_perfil = ctk.CTkComboBox(
             frame_perfil_calculo, values=[], width=340, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
@@ -824,13 +914,13 @@ class AppIMC(ctk.CTk):
         self.combobox_calculo_perfil.pack(side="left")
 
         self.lbl_calculo_perfil = ctk.CTkLabel(self.tab_calculo, text="Nenhum perfil selecionado",
-                                               font=("Arial", 12), text_color=COR_INFO)
+                                               font=_fonte(12), text_color=COR_INFO)
         self.lbl_calculo_perfil.pack(pady=(4, 0))
 
-        frame_inputs = ctk.CTkFrame(self.tab_calculo, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_inputs = ctk.CTkFrame(self.tab_calculo, corner_radius=18, fg_color=SEC_INPUTS)
         frame_inputs.pack(pady=12, padx=(60, 60), fill="x")
 
-        ctk.CTkLabel(frame_inputs, text="Peso (kg):", font=("Arial", 14, "bold")).grid(
+        ctk.CTkLabel(frame_inputs, text="Peso (kg):", font=_fonte(14, "bold")).grid(
             row=0, column=0, padx=(20, 6), pady=(12, 4), sticky="w")
         self.entry_peso = ctk.CTkEntry(frame_inputs,
                                        placeholder_text=f"Ex: 87,8 ou 87.8  (2 - {int(LIMITES['peso_max'])})",
@@ -838,7 +928,7 @@ class AppIMC(ctk.CTk):
                                        border_color=("#C8CDD2", "#3A424D"))
         self.entry_peso.grid(row=1, column=0, padx=(20, 6), pady=(0, 6))
 
-        ctk.CTkLabel(frame_inputs, text="Altura (m):", font=("Arial", 14, "bold")).grid(
+        ctk.CTkLabel(frame_inputs, text="Altura (m):", font=_fonte(14, "bold")).grid(
             row=0, column=1, padx=6, pady=(12, 4), sticky="w")
         self.entry_altura = ctk.CTkEntry(frame_inputs,
                                          placeholder_text=f"Ex: 1,75, 1.75 ou 175",
@@ -846,14 +936,14 @@ class AppIMC(ctk.CTk):
                                          border_color=("#C8CDD2", "#3A424D"))
         self.entry_altura.grid(row=1, column=1, padx=6, pady=(0, 6))
 
-        ctk.CTkLabel(frame_inputs, text="Cintura (cm) (opcional):", font=("Arial", 13)).grid(
+        ctk.CTkLabel(frame_inputs, text="Cintura (cm) (opcional):", font=_fonte(13)).grid(
             row=4, column=0, padx=(20, 6), pady=(6, 4), sticky="w")
         self.entry_cintura = ctk.CTkEntry(frame_inputs, placeholder_text="Ex: 88",
                                           width=180, height=32, corner_radius=12,
                                           border_color=("#C8CDD2", "#3A424D"))
         self.entry_cintura.grid(row=5, column=0, padx=(20, 6), pady=(0, 6))
 
-        ctk.CTkLabel(frame_inputs, text="Quadril (cm) (opcional):", font=("Arial", 13)).grid(
+        ctk.CTkLabel(frame_inputs, text="Quadril (cm) (opcional):", font=_fonte(13)).grid(
             row=4, column=1, padx=6, pady=(6, 4), sticky="w")
         self.entry_quadril = ctk.CTkEntry(frame_inputs, placeholder_text="Ex: 104",
                                           width=190, height=32, corner_radius=12,
@@ -865,23 +955,52 @@ class AppIMC(ctk.CTk):
                                     command=self.converter_cm_para_m)
         self.btn_cm.grid(row=5, column=2, padx=(6, 20), pady=(0, 6))
 
+        # --- Pregas cutâneas (opcional): protocolo de 3 dobras J&P ---
+        frame_pregas = ctk.CTkFrame(self.tab_calculo, corner_radius=18,
+                                    fg_color=SEC_PREGAS)
+        frame_pregas.pack(pady=(0, 8), padx=(60, 60), fill="x")
+
+        linha_pregas = ctk.CTkFrame(frame_pregas, fg_color="transparent")
+        linha_pregas.pack(fill="x", padx=16, pady=(8, 2))
+        ctk.CTkLabel(linha_pregas, text="Pregas cutâneas (opcional)",
+                     font=_fonte(13, "bold"), text_color=COR_PRIMARIA).pack(side="left")
+        self.lbl_pregas_genero = ctk.CTkLabel(
+            linha_pregas, text="", font=_fonte(11, "italic"), text_color=COR_TEXTO_MUT)
+        self.lbl_pregas_genero.pack(side="right")
+
+        linha_campos_pregas = ctk.CTkFrame(frame_pregas, fg_color="transparent")
+        linha_campos_pregas.pack(fill="x", padx=16, pady=(4, 10))
+        self._prega_labels = []
+        self._entries_pregas = []
+        for i in range(3):
+            lbl = ctk.CTkLabel(linha_campos_pregas, text="", font=_fonte(12))
+            lbl.grid(row=0, column=i * 2, padx=(0, 6), pady=(2, 0), sticky="w")
+            self._prega_labels.append(lbl)
+            e = ctk.CTkEntry(linha_campos_pregas, placeholder_text="Ex: 15 mm",
+                             width=110, height=30, corner_radius=10,
+                             border_color=("#C8CDD2", "#3A424D"))
+            e.grid(row=1, column=i * 2, padx=(0, 16), pady=(2, 0), sticky="w")
+            self._entries_pregas.append(e)
+        self._prega_sites = list(nutricao.PREGAS_3_FEMININO)
+        self._atualizar_campos_pregas()
+
         # --- Planejamento nutricional (opcional): TMB e GET ---
         frame_nutri = ctk.CTkFrame(self.tab_calculo, corner_radius=18,
-                                   fg_color=("#EAF4F1", "#20262D"))
+                                   fg_color=SEC_NUTRICAO)
         frame_nutri.pack(pady=(0, 8), padx=(60, 60), fill="x")
 
         linha_top = ctk.CTkFrame(frame_nutri, fg_color="transparent")
         linha_top.pack(fill="x", padx=16, pady=(10, 2))
         ctk.CTkLabel(linha_top, text="Planejamento nutricional (TMB e GET)",
-                     font=("Arial", 14, "bold"), text_color=COR_PRIMARIA).pack(side="left")
+                     font=_fonte(14, "bold"), text_color=COR_PRIMARIA).pack(side="left")
         self.lbl_nutri_aviso = ctk.CTkLabel(
-            linha_top, text="", font=("Arial", 11, "italic"), text_color=COR_TEXTO_MUT)
+            linha_top, text="", font=_fonte(11, "italic"), text_color=COR_TEXTO_MUT)
         self.lbl_nutri_aviso.pack(side="right")
 
         linha_form = ctk.CTkFrame(frame_nutri, fg_color="transparent")
         linha_form.pack(fill="x", padx=16, pady=(2, 10))
         ctk.CTkLabel(linha_form, text="Nível de atividade física:",
-                     font=("Arial", 12)).pack(side="left")
+                     font=_fonte(12)).pack(side="left")
         self.combobox_atividade = ctk.CTkComboBox(
             linha_form, width=320, height=30, corner_radius=10,
             border_color=("#C8CDD2", "#3A424D"),
@@ -890,7 +1009,7 @@ class AppIMC(ctk.CTk):
         self.combobox_atividade.pack(side="left", padx=(8, 24))
 
         ctk.CTkLabel(linha_form, text="Método da TMB:",
-                     font=("Arial", 12)).pack(side="left")
+                     font=_fonte(12)).pack(side="left")
         self.combobox_metodo_tmb = ctk.CTkComboBox(
             linha_form, width=140, height=30, corner_radius=10,
             border_color=("#C8CDD2", "#3A424D"),
@@ -902,48 +1021,54 @@ class AppIMC(ctk.CTk):
                                         text=f"Limites aceitos: peso {LIMITES['peso_min']}-{LIMITES['peso_max']}kg, "
                                              f"altura {LIMITES['altura_min']}-{LIMITES['altura_max']}m, "
                                              f"idade {LIMITES['idade_min']}-{LIMITES['idade_max']} anos",
-                                        font=("Arial", 11), text_color=COR_TEXTO_MUT)
+                                        font=_fonte(11), text_color=COR_TEXTO_MUT)
         self.lbl_limites.grid(row=7, column=0, columnspan=3, padx=20, pady=(2, 8))
 
-        self.btn_calcular = ctk.CTkButton(self.tab_calculo, text="Calcular IMC", font=("Arial", 16, "bold"),
+        self.btn_calcular = ctk.CTkButton(self.tab_calculo, text="Calcular IMC", font=_fonte(16, "bold"),
                                           height=46, width=300, corner_radius=16,
                                           fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                           command=self.processar_calculo)
         self.btn_calcular.pack(pady=(6, 6))
 
         self.frame_resultado = ctk.CTkScrollableFrame(self.tab_calculo, corner_radius=18,
-                                                      fg_color=("#FFFFFF", "#22262D"),
+                                                      fg_color=SEC_RESULTADO,
                                                       label_text="")
         self.frame_resultado.pack(pady=(0, 8), padx=(60, 60), fill="both", expand=True)
 
-        self.lbl_resultado_imc = ctk.CTkLabel(self.frame_resultado, text="---", font=("Arial", 34, "bold"))
+        self.lbl_resultado_imc = ctk.CTkLabel(self.frame_resultado, text="---", font=_fonte(34, "bold"))
+        self._cor_resultado_imc = self.lbl_resultado_imc.cget("text_color")
         self.lbl_resultado_imc.pack(pady=(12, 2))
         self.lbl_classificacao = ctk.CTkLabel(self.frame_resultado, text="Selecione um perfil e preencha os dados",
-                                              font=("Arial", 16, "bold"))
+                                              font=_fonte(16, "bold"))
+        self._cor_resultado_classe = self.lbl_classificacao.cget("text_color")
         self.lbl_classificacao.pack(pady=2)
-        self.lbl_peso_ideal = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 13, "italic"),
+        self.lbl_peso_ideal = ctk.CTkLabel(self.frame_resultado, text="", font=_fonte(13, "italic"),
                                            text_color=COR_TEXTO_MUT, wraplength=620, justify="center")
         self.lbl_peso_ideal.pack(pady=2)
 
-        self.lbl_saude = ctk.CTkLabel(self.frame_resultado, text="", font=("Arial", 12),
+        self.lbl_saude = ctk.CTkLabel(self.frame_resultado, text="", font=_fonte(12),
                                       text_color=COR_INFO, wraplength=560, justify="center")
         self.lbl_saude.pack(pady=2)
+
+        self.lbl_pregas_result = ctk.CTkLabel(self.frame_resultado, text="", font=_fonte(12),
+                                              text_color=COR_INFO, wraplength=560, justify="center")
+        self.lbl_pregas_result.pack(pady=2)
 
         self.lbl_barra = ctk.CTkLabel(self.frame_resultado, text="")
         self.lbl_barra.pack(pady=4)
 
         # Painel de TMB / GET (oculto até haver resultado nutricional)
         self.frame_get = ctk.CTkFrame(self.frame_resultado, corner_radius=14,
-                                      fg_color=("#EAF4F1", "#232A32"))
+                                      fg_color=SEC_GET)
         self.lbl_get_titulo = ctk.CTkLabel(self.frame_get, text="Gasto Energético",
-                                           font=("Arial", 14, "bold"), text_color=COR_PRIMARIA)
+                                           font=_fonte(14, "bold"), text_color=COR_PRIMARIA)
         self.lbl_get_titulo.pack(anchor="w", padx=14, pady=(8, 4))
         self.lbl_get_result = ctk.CTkLabel(
-            self.frame_get, text="", font=("Arial", 13), justify="center",
+            self.frame_get, text="", font=_fonte(13), justify="center",
             wraplength=600, text_color=("#000000", "#E6E6E6"))
         self.lbl_get_result.pack(padx=14, pady=(0, 8))
 
-        self.btn_exportar = ctk.CTkButton(self.frame_resultado, text="Exportar PDF", font=("Arial", 13),
+        self.btn_exportar = ctk.CTkButton(self.frame_resultado, text="Exportar PDF", font=_fonte(13),
                                           width=130, height=32, corner_radius=12,
                                           fg_color=("#94A3B8", "#4A5260"), hover_color=("#7C8AA0", "#5A6373"),
                                           command=self.exportar_pdf)
@@ -1006,6 +1131,63 @@ class AppIMC(ctk.CTk):
         """Retorna 'mifflin' ou 'harris' conforme combo."""
         rotulo = self.combobox_metodo_tmb.get()
         return "harris" if "Harris" in rotulo else "mifflin"
+
+    # ---------- Pregas cutâneas (3 dobras) ----------
+    def _atualizar_campos_pregas(self):
+        """Adapta os campos de prega ao gênero do perfil ativo (Jackson & Pollock)."""
+        if not hasattr(self, "_prega_labels"):
+            return
+        genero = "Masculino"
+        if self.perfil_atual_id:
+            p = self.db.buscar_perfil(self.perfil_atual_id)
+            if p:
+                genero = p[3]
+        self._prega_sites = list(nutricao.pregas_3_obrigatorias(genero))
+        self.lbl_pregas_genero.configure(text=f"3 dobras Jackson & Pollock — {genero}")
+        for lbl, sitio in zip(self._prega_labels, self._prega_sites):
+            lbl.configure(text=f"{nutricao.PREGAS_ROTULOS[sitio]} (mm):")
+
+    def _ler_pregas(self):
+        """Lê os campos de prega; retorna (dict {sitio: mm}, erro|None)."""
+        texto_err = None
+        pregas = {}
+        preenchidas = 0
+        for sitio, entry in zip(self._prega_sites, self._entries_pregas):
+            texto = entry.get().strip()
+            if not texto:
+                continue
+            try:
+                valor = float(AppIMC._limpar_numero(texto))
+            except ValueError:
+                texto_err = "Valores de prega devem ser numéricos (em mm)."
+                break
+            pregas[sitio] = valor
+            preenchidas += 1
+        if texto_err:
+            return None, texto_err
+        if preenchidas not in (0, 3):
+            return None, "Preencha as 3 pregas do protocolo ou deixe todas em branco."
+        if preenchidas == 3 and not all(
+                LIMITES["prega_min"] <= v <= LIMITES["prega_max"] for v in pregas.values()):
+            return None, (f"Pregas devem estar entre {LIMITES['prega_min']} e "
+                          f"{LIMITES['prega_max']} mm.")
+        return (pregas or None), None
+
+    def _atualizar_label_pregas(self, pregas):
+        if not hasattr(self, "lbl_pregas_result"):
+            return
+        if not pregas or pregas[0] is None:
+            self.lbl_pregas_result.configure(text="")
+            return
+        gordura = pregas[0]
+        idx = {"peitoral": 1, "abdominal": 2, "coxa": 3,
+               "tricipital": 4, "suprailiaca": 5}
+        partes = [f"Gordura corporal (pregas): {gordura:.1f}%"]
+        for sitio in self._prega_sites:
+            pos = idx[sitio]
+            if pregas[pos] is not None:
+                partes.append(f"{nutricao.PREGAS_ROTULOS[sitio]}: {pregas[pos]:.0f} mm")
+        self.lbl_pregas_result.configure(text="  •  ".join(partes))
 
     def _ocultar_tela_nutricional(self):
         try:
@@ -1092,6 +1274,11 @@ class AppIMC(ctk.CTk):
 
         cintura, quadril = self._ler_medidas_corpo()
 
+        pregas, erro_pregas = self._ler_pregas()
+        if erro_pregas:
+            self._erro_calculo(erro_pregas)
+            return
+
         atividade = self._atividade_ativa()
         metodo = self._metodo_tmb_ativa()
         metodo_db = "harris" if metodo == "harris" else "mifflin"
@@ -1099,7 +1286,7 @@ class AppIMC(ctk.CTk):
         imc, classe = self.db.salvar_registro(
             self.perfil_atual_id, peso, altura, idade, genero,
             cintura_cm=cintura, quadril_cm=quadril,
-            atividade=atividade, metodo_tmb=metodo_db)
+            atividade=atividade, metodo_tmb=metodo_db, pregas=pregas)
         p_min, p_max = self.db.calcular_peso_ideal(altura, idade)
 
         cor_texto = self._cor_para_classificacao(classe)
@@ -1108,6 +1295,7 @@ class AppIMC(ctk.CTk):
         detalhe = self.db.buscar_ultima_medicao_detalhada(self.perfil_atual_id)
         self._ultima_saude = detalhe
         self._ultima_nutri = self.db.buscar_ultimo_nutricional(self.perfil_atual_id)
+        self._ultima_pregas = self.db.buscar_ultima_pregas(self.perfil_atual_id)
 
         self.lbl_resultado_imc.configure(text=f"IMC: {imc}", text_color=cor_texto)
         self.lbl_classificacao.configure(text=classe, text_color=cor_texto)
@@ -1116,6 +1304,7 @@ class AppIMC(ctk.CTk):
             text_color=COR_TEXTO_MUT)
         self._atualizar_label_saude(detalhe)
         self._atualizar_tela_nutricional()
+        self._atualizar_label_pregas(self._ultima_pregas)
 
         try:
             barras_png = grafico.gerar_barra_imc(imc, idade)
@@ -1134,6 +1323,7 @@ class AppIMC(ctk.CTk):
         self.lbl_classificacao.configure(text=mensagem, text_color=COR_PERIGO)
         self.lbl_peso_ideal.configure(text="")
         self.lbl_saude.configure(text="")
+        self.lbl_pregas_result.configure(text="")
         self.lbl_barra.configure(image="", text="")
         self._ultima_nutri = None
         self._ocultar_tela_nutricional()
@@ -1170,10 +1360,11 @@ class AppIMC(ctk.CTk):
         meta = perfil[4] if perfil else None
         saude = getattr(self, "_ultima_saude", None)
         nutricional = getattr(self, "_ultima_nutri", None)
+        pregas = getattr(self, "_ultima_pregas", None)
         try:
             relatorio.gerar_pdf_relatorio(
                 caminho, p[1], p[2], p[3], peso, altura, imc, classe, p_min, p_max,
-                cor, meta, saude=saude, nutricional=nutricional)
+                cor, meta, saude=saude, nutricional=nutricional, pregas=pregas)
             messagebox.showinfo("Exportar PDF", f"Relatório salvo em:\n{caminho}")
             logger.LOGGER.info("PDF exportado: %s", caminho)
         except Exception as e:
@@ -1227,26 +1418,26 @@ class AppIMC(ctk.CTk):
         scroll.pack(fill="both", expand=True, padx=14, pady=(8, 0))
 
         ctk.CTkLabel(scroll, text="Backup automático",
-                     font=("Arial", 18, "bold")).pack(pady=(10, 4))
+                     font=_fonte(18, "bold")).pack(pady=(10, 4))
         ctk.CTkLabel(scroll, text="Ao fechar o app, será perguntado se deseja fazer um backup .zip local dos dados.",
-                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
+                     font=_fonte(12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
 
         est = ctk.CTkFrame(scroll, corner_radius=12, fg_color=("#EDF1F4", "#2A2F37"))
         est.pack(fill="x", padx=10, pady=6)
         self.lbl_backup_status = ctk.CTkLabel(
-            est, text="", font=("Arial", 13), justify="center", wraplength=440)
+            est, text="", font=_fonte(13), justify="center", wraplength=440)
         self.lbl_backup_status.pack(padx=12, pady=10)
 
         ctk.CTkLabel(scroll, text="Envio por e-mail (opcional)",
-                     font=("Arial", 16, "bold")).pack(pady=(6, 4))
+                     font=_fonte(16, "bold")).pack(pady=(6, 4))
         ctk.CTkLabel(scroll, text="Deixe em branco para desativar o envio.",
-                     font=("Arial", 12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
+                     font=_fonte(12), text_color=COR_TEXTO_MUT).pack(pady=(0, 8))
 
         form = ctk.CTkFrame(scroll, fg_color="transparent")
         form.pack(padx=10)
 
         def campo(rotulo, valor, show=None, largura=380):
-            ctk.CTkLabel(form, text=rotulo, font=("Arial", 12), anchor="w").pack(anchor="w", padx=6)
+            ctk.CTkLabel(form, text=rotulo, font=_fonte(12), anchor="w").pack(anchor="w", padx=6)
             e = ctk.CTkEntry(form, width=largura, height=32, corner_radius=10,
                              show=show, border_color=("#C8CDD2", "#3A424D"))
             e.insert(0, valor)
@@ -1331,7 +1522,7 @@ class AppIMC(ctk.CTk):
 
         frame_nav = ctk.CTkFrame(dialog, corner_radius=14)
         frame_nav.pack(fill="x", padx=14, pady=(14, 6))
-        ctk.CTkLabel(frame_nav, text="Pasta:", font=("Arial", 13)).pack(side="left", padx=(8, 6))
+        ctk.CTkLabel(frame_nav, text="Pasta:", font=_fonte(13)).pack(side="left", padx=(8, 6))
         entry_pasta = ctk.CTkEntry(frame_nav, width=300, height=36, corner_radius=10)
         entry_pasta.pack(side="left", padx=(0, 6))
         btn_ir = ctk.CTkButton(frame_nav, text="Ir", width=46, height=36, corner_radius=12)
@@ -1345,7 +1536,7 @@ class AppIMC(ctk.CTk):
 
         frame_nome = ctk.CTkFrame(dialog, fg_color="transparent")
         frame_nome.pack(fill="x", padx=14, pady=10)
-        ctk.CTkLabel(frame_nome, text="Nome do arquivo:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(frame_nome, text="Nome do arquivo:", font=_fonte(13)).pack(side="left", padx=(0, 8))
         entry_nome = ctk.CTkEntry(frame_nome, width=360, height=36, corner_radius=10)
         entry_nome.insert(0, nome_sugerido)
         entry_nome.pack(side="left")
@@ -1423,7 +1614,7 @@ class AppIMC(ctk.CTk):
     def configurar_tela_historico(self):
         frame_filtro = ctk.CTkFrame(self.tab_historico, fg_color="transparent")
         frame_filtro.pack(pady=(12, 0))
-        ctk.CTkLabel(frame_filtro, text="Perfil:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(frame_filtro, text="Perfil:", font=_fonte(13)).pack(side="left", padx=(0, 8))
         self.combobox_historico_perfil = ctk.CTkComboBox(
             frame_filtro, values=[], width=300, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
@@ -1431,8 +1622,8 @@ class AppIMC(ctk.CTk):
         self.combobox_historico_perfil.pack(side="left")
 
         self.scroll_historico = ctk.CTkScrollableFrame(self.tab_historico, label_text="Medições do perfil ativo",
-                                                       corner_radius=16, fg_color=("#FFFFFF", "#22262D"),
-                                                       label_font=("Arial", 13, "bold"))
+                                                       corner_radius=16, fg_color=SEC_HIST,
+                                                       label_font=_fonte(13, "bold"))
         self.scroll_historico.pack(fill="both", expand=True, padx=16, pady=10)
         self.btn_limpar_historico = ctk.CTkButton(self.tab_historico, text="Limpar histórico deste perfil",
                                                   width=230, height=34, corner_radius=13,
@@ -1445,23 +1636,59 @@ class AppIMC(ctk.CTk):
             widget.destroy()
 
         if not self.perfil_atual_id:
-            ctk.CTkLabel(self.scroll_historico, text="Selecione um perfil.", font=("Arial", 13)).pack(pady=20)
+            ctk.CTkLabel(self.scroll_historico, text="Selecione um perfil.", font=_fonte(13)).pack(pady=20)
             return
 
-        registros = self.db.buscar_historico(self.perfil_atual_id)
+        registros = self.db.buscar_historico_com_id(self.perfil_atual_id)
         if not registros:
             ctk.CTkLabel(self.scroll_historico,
-                         text="Nenhum registro encontrado para este perfil ainda.", font=("Arial", 13)).pack(pady=20)
+                         text="Nenhum registro encontrado para este perfil ainda.", font=_fonte(13)).pack(pady=20)
             return
 
         for reg in registros:
-            peso, altura, imc, classe, data = reg
+            reg_id, peso, altura, imc, classe, data = reg
             cor = self._cor_para_classificacao(classe)
             texto = f"{data}  |  {peso:.1f}kg / {altura:.2f}m  |  IMC: {imc} ({classe})"
-            card = ctk.CTkLabel(
-                self.scroll_historico, text=texto, font=("Arial", 13), anchor="w", justify="left",
-                fg_color=("#EDF1F4", "#2B3037"), height=42, corner_radius=12)
+
+            card = ctk.CTkFrame(self.scroll_historico,
+                                fg_color=SEC_CARD_HIST, corner_radius=12)
             card.pack(fill="x", pady=5, padx=10)
+            ctk.CTkLabel(card, text=texto, font=_fonte(13), anchor="w", justify="left",
+                         fg_color="transparent").pack(side="left", fill="x", expand=True,
+                                                      padx=(14, 4), pady=8)
+            ctk.CTkButton(
+                card, text="Excluir", font=_fonte(11), width=66, height=28,
+                corner_radius=10, fg_color="#D64545", hover_color="#B83838",
+                command=lambda rid=reg_id, t=texto: self.excluir_registro(rid, t),
+            ).pack(side="right", padx=(4, 12), pady=4)
+
+    def excluir_registro(self, registro_id, descricao):
+        if not messagebox.askyesno(
+                "Excluir medição",
+                f"Excluir esta medição?\n\n{descricao}\n\n"
+                "O registro será removido do histórico, dos gráficos e dos cálculos deste perfil."):
+            return
+        self.db.excluir_registro(registro_id)
+        logger.LOGGER.info("Medição %s excluída do perfil %s", registro_id, self.perfil_atual_id)
+        self._limpar_resultado_calculo()
+        self.atualizar_telas_do_perfil()
+
+    def _limpar_resultado_calculo(self):
+        """Limpa o painel de resultado da aba Cálculo e os dados da última medição em cache."""
+        self._ultimo_resultado = None
+        self._ultima_saude = None
+        self._ultima_nutri = None
+        self._ultima_pregas = None
+        self._ultimo_perfil_calculo = None
+        self.lbl_resultado_imc.configure(text="---", text_color=self._cor_resultado_imc)
+        self.lbl_classificacao.configure(
+            text="Selecione um perfil e preencha os dados", text_color=self._cor_resultado_classe)
+        self.lbl_peso_ideal.configure(text="")
+        self.lbl_saude.configure(text="")
+        self.lbl_pregas_result.configure(text="")
+        self.lbl_barra.configure(image="", text="")
+        self._ocultar_tela_nutricional()
+        logger.LOGGER.info("Resultado da aba Cálculo limpo")
 
     def limpar_historico(self):
         if not self.perfil_atual_id:
@@ -1478,7 +1705,7 @@ class AppIMC(ctk.CTk):
     def configurar_tela_evolucao(self):
         frame_filtro = ctk.CTkFrame(self.tab_evolucao, fg_color="transparent")
         frame_filtro.pack(pady=(12, 0))
-        ctk.CTkLabel(frame_filtro, text="Perfil:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(frame_filtro, text="Perfil:", font=_fonte(13)).pack(side="left", padx=(0, 8))
         self.combobox_evolucao_perfil = ctk.CTkComboBox(
             frame_filtro, values=[], width=300, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
@@ -1486,13 +1713,13 @@ class AppIMC(ctk.CTk):
         self.combobox_evolucao_perfil.pack(side="left")
 
         self.lbl_evolucao_titulo = ctk.CTkLabel(self.tab_evolucao, text="Evolução do IMC",
-                                                font=("Arial", 17, "bold"))
+                                                font=_fonte(17, "bold"))
         self.lbl_evolucao_titulo.pack(pady=10)
         self.lbl_evolucao_img = ctk.CTkLabel(self.tab_evolucao, text="")
         self.lbl_evolucao_img.pack(padx=10, pady=2)
 
         self.btn_exportar_grafico = ctk.CTkButton(self.tab_evolucao, text="Exportar gráfico (PDF)",
-                                                  font=("Arial", 13), width=220, height=34, corner_radius=13,
+                                                  font=_fonte(13), width=220, height=34, corner_radius=13,
                                                   fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                                   command=self.exportar_grafico)
         self.btn_exportar_grafico.pack(pady=(0, 10))
@@ -1541,37 +1768,37 @@ class AppIMC(ctk.CTk):
     # Tela de Meta de Peso
     # ------------------------------------------------------------------
     def configurar_tela_meta(self):
-        frame_meta = ctk.CTkFrame(self.tab_meta, corner_radius=18, fg_color=("#FFFFFF", "#22262D"))
+        frame_meta = ctk.CTkFrame(self.tab_meta, corner_radius=18, fg_color=SEC_META)
         frame_meta.pack(pady=14, padx=(180, 180), fill="both", expand=True)
 
-        self.lbl_meta_titulo = ctk.CTkLabel(frame_meta, text="Meta de Peso", font=("Arial", 20, "bold"))
+        self.lbl_meta_titulo = ctk.CTkLabel(frame_meta, text="Meta de Peso", font=_fonte(20, "bold"))
         self.lbl_meta_titulo.pack(pady=(20, 10))
 
         frame_meta_perfil = ctk.CTkFrame(frame_meta, fg_color="transparent")
         frame_meta_perfil.pack(pady=4)
-        ctk.CTkLabel(frame_meta_perfil, text="Perfil:", font=("Arial", 13)).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(frame_meta_perfil, text="Perfil:", font=_fonte(13)).pack(side="left", padx=(0, 8))
         self.combobox_meta_perfil = ctk.CTkComboBox(
             frame_meta_perfil, values=[], width=300, height=34, corner_radius=12,
             border_color=("#C8CDD2", "#3A424D"),
             state="readonly", command=self._ao_escolher_perfil_na_meta)
         self.combobox_meta_perfil.pack(side="left")
 
-        self.lbl_meta_perfil = ctk.CTkLabel(frame_meta, text="", font=("Arial", 13))
+        self.lbl_meta_perfil = ctk.CTkLabel(frame_meta, text="", font=_fonte(13))
         self.lbl_meta_perfil.pack(pady=4)
 
-        ctk.CTkLabel(frame_meta, text="Peso meta (kg):", font=("Arial", 13)).pack(pady=8)
+        ctk.CTkLabel(frame_meta, text="Peso meta (kg):", font=_fonte(13)).pack(pady=8)
         self.entry_meta = ctk.CTkEntry(frame_meta, width=180, height=36, corner_radius=12,
                                        border_color=("#C8CDD2", "#3A424D"),
                                        placeholder_text="Ex: 72")
         self.entry_meta.pack(pady=4)
 
         self.btn_meta = ctk.CTkButton(frame_meta, text="Definir Meta", width=180, height=36, corner_radius=14,
-                                      font=("Arial", 14, "bold"),
+                                      font=_fonte(14, "bold"),
                                       fg_color=COR_PRIMARIA, hover_color=COR_PRIMARIA_HOVER,
                                       command=self.definir_meta)
         self.btn_meta.pack(pady=10)
 
-        self.lbl_meta_status = ctk.CTkLabel(frame_meta, text="", font=("Arial", 13, "italic"))
+        self.lbl_meta_status = ctk.CTkLabel(frame_meta, text="", font=_fonte(13, "italic"))
         self.lbl_meta_status.pack(pady=6)
 
     def _ao_escolher_perfil_na_meta(self, selecionado):

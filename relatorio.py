@@ -57,7 +57,7 @@ def _gerar_recomendacao(classe, saude, p_min, p_max):
 
 def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
                         p_min, p_max, cor="#333333", meta=None, data=None, saude=None,
-                        nutricional=None):
+                        nutricional=None, pregas=None):
     """Gera um PDF com o resultado da medição e salva no caminho informado.
 
     ``saude`` é opcional e deve ser uma tupla na ordem retornada por
@@ -66,6 +66,10 @@ def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
 
     ``nutricional`` é opcional e segue ``Database.buscar_ultimo_nutricional``:
     (tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total, data_registro).
+
+    ``pregas`` é opcional e segue ``Database.buscar_ultima_pregas``:
+    (gordura_pct_pregas, prega_peitoral, prega_abdominal, prega_coxa,
+     prega_tricipital, prega_suprailiaca).
     """
     c = canvas.Canvas(caminho, pagesize=A4)
     largura, altura_pagina = A4
@@ -138,6 +142,26 @@ def gerar_pdf_relatorio(caminho, nome, idade, genero, peso, altura, imc, classe,
             linhas.append(("GET", f"{_get_total:.0f} kcal/dia"))
         if linhas:
             bloco("Gasto Energético", linhas)
+
+    # Bloco de pregas cutâneas (Jackson & Pollock, 3 dobras) quando disponível
+    if pregas:
+        gordura, prega_peitoral, prega_abdominal, prega_coxa, \
+            prega_tricipital, prega_suprailiaca = pregas
+        linhas = []
+        if gordura is not None:
+            linhas.append(("Gordura corporal (pregas)", f"{gordura:.1f}%"))
+        if prega_peitoral is not None:
+            linhas.append(("Peitoral", f"{prega_peitoral:.0f} mm"))
+        if prega_abdominal is not None:
+            linhas.append(("Abdominal", f"{prega_abdominal:.0f} mm"))
+        if prega_coxa is not None:
+            linhas.append(("Coxa", f"{prega_coxa:.0f} mm"))
+        if prega_tricipital is not None:
+            linhas.append(("Tricipital", f"{prega_tricipital:.0f} mm"))
+        if prega_suprailiaca is not None:
+            linhas.append(("Suprailíaca", f"{prega_suprailiaca:.0f} mm"))
+        if linhas:
+            bloco("Pregas cutâneas (Jackson & Pollock)", linhas)
 
     c.setFont("Helvetica-Bold", 12)
     c.setFillColor("#00B4D8")

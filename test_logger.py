@@ -1,6 +1,7 @@
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 
 class TestLogger(unittest.TestCase):
@@ -31,7 +32,10 @@ class TestLogger(unittest.TestCase):
             causar()
         except ValueError:
             import sys
-            logger._log_excecao_nao_tratada(*sys.exc_info())
+            # preserva o log, mas nao abre a janela "Erro inesperado" (bloquearia a suite)
+            with mock.patch("tkinter.messagebox.showerror") as mock_showerror:
+                logger._log_excecao_nao_tratada(*sys.exc_info())
+            mock_showerror.assert_called_once()
 
         # restaura pasta original e deixa sem handlers extras
         logger.PASTA_LOGS = pasta_orig

@@ -12,6 +12,8 @@ LIMITES = {
     "altura_max": 2.50,
     "idade_min": 2,
     "idade_max": 120,
+    "prega_min": 2.0,
+    "prega_max": 80.0,
 }
 
 
@@ -90,6 +92,12 @@ class Database:
                 fator_atividade REAL,
                 metodo_tmb TEXT,
                 get_total REAL,
+                prega_peitoral REAL,
+                prega_abdominal REAL,
+                prega_coxa REAL,
+                prega_tricipital REAL,
+                prega_suprailiaca REAL,
+                gordura_pct_pregas REAL,
                 FOREIGN KEY (perfil_id) REFERENCES perfil (id) ON DELETE CASCADE
             )
         """)
@@ -109,6 +117,12 @@ class Database:
             "fator_atividade": "REAL",
             "metodo_tmb": "TEXT",
             "get_total": "REAL",
+            "prega_peitoral": "REAL",
+            "prega_abdominal": "REAL",
+            "prega_coxa": "REAL",
+            "prega_tricipital": "REAL",
+            "prega_suprailiaca": "REAL",
+            "gordura_pct_pregas": "REAL",
         }
         for nome, tipo in novas.items():
             if nome not in colunas:
@@ -222,11 +236,13 @@ class Database:
 
     def salvar_registro(self, perfil_id, peso, altura, idade, genero,
                         cintura_cm=None, quadril_cm=None, atividade=None,
-                        metodo_tmb="mifflin"):
+                        metodo_tmb="mifflin", pregas=None):
         """Grava uma medição e também os cálculos nutricionais (TMB/GET) se aplicáveis.
 
         ``atividade`` é a chave (ex.: "moderado") do fator de atividade e
-        ``metodo_tmb`` é "mifflin" ou "harris".
+        ``metodo_tmb`` é "mifflin" ou "harris". ``pregas`` é um dict opcional
+        {chave: mm} (ex.: {"peitoral": 15, "abdominal": 20, "coxa": 25}) usado
+        para estimar a % de gordura corporal pelo protocolo de 3 dobras.
         """
         imc = peso / (altura ** 2)
         classificacao = self.classificar_imc(imc, idade)
@@ -249,6 +265,18 @@ class Database:
             if fator_atividade and base is not None:
                 get_total = _get(base, fator_atividade)
 
+        prega_peitoral = prega_abdominal = prega_coxa = None
+        prega_tricipital = prega_suprailiaca = None
+        gordura_pct_pregas = None
+        if pregas:
+            prega_peitoral = pregas.get("peitoral")
+            prega_abdominal = pregas.get("abdominal")
+            prega_coxa = pregas.get("coxa")
+            prega_tricipital = pregas.get("tricipital")
+            prega_suprailiaca = pregas.get("suprailiaca")
+            from nutricao import gordura_pct_pregas as _pct_pregas
+            gordura_pct_pregas = _pct_pregas(pregas, idade, genero)
+
         with self.conectar() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -256,13 +284,17 @@ class Database:
                 INSERT INTO historico (
                     perfil_id, peso, altura, idade, genero, imc, classificacao, data_registro,
                     cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura,
-                    tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total
+                    tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total,
+                    prega_peitoral, prega_abdominal, prega_coxa, prega_tricipital,
+                    prega_suprailiaca, gordura_pct_pregas
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (perfil_id, peso, altura, idade, genero, round(imc, 2), classificacao, data_atual,
                  cintura_cm, quadril_cm, gordura, rcq, risco,
-                 tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total),
+                 tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total,
+                 prega_peitoral, prega_abdominal, prega_coxa, prega_tricipital,
+                 prega_suprailiaca, gordura_pct_pregas),
             )
             conn.commit()
 
@@ -319,6 +351,26 @@ class Database:
             )
             return cursor.fetchall()
 
+    def buscar_historico_com_id(self, perfil_id):
+        """Igual a ``buscar_historico``, mas inclui o ``id`` de cada medição
+        (necessário para editar/excluir registros individuais)."""
+        with self.conectar() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, peso, altura, imc, classificacao, data_registro FROM historico "
+                "WHERE perfil_id = ? ORDER BY id DESC",
+                (perfil_id,),
+            )
+            return cursor.fetchall()
+
+    def excluir_registro(self, registro_id):
+        """Exclui uma única medição do histórico pelo seu id."""
+        with self.conectar() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM historico WHERE id = ?", (registro_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
     def buscar_historico_cronologico(self, perfil_id):
         with self.conectar() as conn:
             cursor = conn.cursor()
@@ -360,6 +412,23 @@ class Database:
             )
             return cursor.fetchone()
 
+    def buscar_ultima_pregas(self, perfil_id):
+        """Retorna gordura (% por pregas) e as 5 pregas do protocolo da última medição.
+
+        Ordem do retorno:
+        (gordura_pct_pregas, prega_peitoral, prega_abdominal, prega_coxa,
+         prega_tricipital, prega_suprailiaca), tudo None quando não houver medição.
+        """
+        with self.conectar() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT gordura_pct_pregas, prega_peitoral, prega_abdominal, prega_coxa, "
+                "prega_tricipital, prega_suprailiaca "
+                "FROM historico WHERE perfil_id = ? ORDER BY id DESC LIMIT 1",
+                (perfil_id,),
+            )
+            return cursor.fetchone()
+
     # ---------- Exportação (CSV / JSON) ----------
     def coletar_dados_exportacao(self):
         """Coleta todos os perfis e seus registros para exportação."""
@@ -373,11 +442,15 @@ class Database:
                          "imc", "classificacao", "data_registro", "cintura_cm",
                          "quadril_cm", "gordura_pct", "rcq", "risco_cintura",
                          "tmb_mifflin", "tmb_harris", "fator_atividade",
-                         "metodo_tmb", "get_total"]
+                         "metodo_tmb", "get_total", "prega_peitoral",
+                         "prega_abdominal", "prega_coxa", "prega_tricipital",
+                         "prega_suprailiaca", "gordura_pct_pregas"]
             cursor.execute(
                 "SELECT id, perfil_id, peso, altura, idade, genero, imc, classificacao, "
                 "data_registro, cintura_cm, quadril_cm, gordura_pct, rcq, risco_cintura, "
-                "tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total "
+                "tmb_mifflin, tmb_harris, fator_atividade, metodo_tmb, get_total, "
+                "prega_peitoral, prega_abdominal, prega_coxa, prega_tricipital, "
+                "prega_suprailiaca, gordura_pct_pregas "
                 "FROM historico ORDER BY perfil_id, id")
             historico = [dict(zip(hist_cols, linha)) for linha in cursor.fetchall()]
             return {"perfis": perfis, "historico": historico}

@@ -139,3 +139,75 @@ def resumo_nutricional(peso_kg, altura_m, idade, genero, atividade="sedentario",
         "get": get,
         "get_metodo": metodo,
     }
+
+
+# ---------------------------------------------------------------------------
+# Pregas cutâneas — Jackson & Pollock (3 dobras) + equação de Siri
+# ---------------------------------------------------------------------------
+
+# Prega cutânea -> rótulo legível (usado na interface).
+PREGAS_ROTULOS = {
+    "peitoral": "Peitoral",
+    "abdominal": "Abdominal",
+    "coxa": "Coxa",
+    "tricipital": "Tricipital",
+    "suprailiaca": "Suprailíaca",
+}
+
+PREGAS_3_MASCULINO = ("peitoral", "abdominal", "coxa")
+PREGAS_3_FEMININO = ("tricipital", "suprailiaca", "coxa")
+
+# Faixa aceitável (mm) para cada prega.
+PREGA_MIN_MM = 2.0
+PREGA_MAX_MM = 80.0
+
+
+def pregas_3_obrigatorias(genero):
+    """Retorna a tupla das 3 dobras exigidas por Jackson & Pollock conforme o gênero."""
+    if genero == "Masculino":
+        return PREGAS_3_MASCULINO
+    # "Feminino" e "Outro": usa a referência de 3 dobras feminina.
+    return PREGAS_3_FEMININO
+
+
+def densidade_pregas(soma_mm, idade, genero):
+    """Densidade corporal pela equação de Jackson & Pollock (3 dobras, 1978).
+
+    Para o gênero "Outro" é usada a média das equações masculina e feminina.
+    Retorna None fora da faixa de validade (idade < 18 ou > 100).
+    """
+    if soma_mm is None or soma_mm <= 0:
+        return None
+    if not idade or not (18 <= idade <= 100):
+        return None
+    soma2 = soma_mm ** 2
+    if genero == "Masculino":
+        return 1.10938 - 0.0008267 * soma_mm + 0.0000016 * soma2 - 0.0002574 * idade
+    if genero == "Feminino":
+        return 1.0994921 - 0.0009929 * soma_mm + 0.0000023 * soma2 - 0.0001392 * idade
+    masc = 1.10938 - 0.0008267 * soma_mm + 0.0000016 * soma2 - 0.0002574 * idade
+    fem = 1.0994921 - 0.0009929 * soma_mm + 0.0000023 * soma2 - 0.0001392 * idade
+    return (masc + fem) / 2.0
+
+
+def gordura_pct_pregas(pregas, idade, genero):
+    """% de gordura corporal pelas 3 dobras (Jackson & Pollock) + Siri.
+
+    ``pregas`` é um dict {chave: mm}. Retorna None quando falta alguma prega
+    obrigatória do protocolo, algum valor está fora da faixa aceita ou a idade
+    está fora do intervalo de validade (18 a 100 anos).
+    """
+    if not pregas:
+        return None
+    sitios = pregas_3_obrigatorias(genero)
+    valores = []
+    for sitio in sitios:
+        valor = pregas.get(sitio)
+        if valor is None or not (PREGA_MIN_MM <= valor <= PREGA_MAX_MM):
+            return None
+        valores.append(valor)
+    dc = densidade_pregas(sum(valores), idade, genero)
+    if dc is None:
+        return None
+    # Equação de Siri: %G = (4,95 / DC - 4,50) x 100
+    return round((4.95 / dc - 4.50) * 100.0, 1)

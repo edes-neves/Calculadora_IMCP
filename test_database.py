@@ -128,6 +128,31 @@ class TestDatabase(unittest.TestCase):
         self.db.excluir_historico_do_perfil(pid)
         self.assertEqual(self.db.buscar_historico(pid), [])
 
+    def test_excluir_registro_individual(self):
+        pid = self.db.criar_perfil("João", 30, "Masculino")
+        self.db.salvar_registro(pid, 75, 1.75, 30, "Masculino")
+        self.db.salvar_registro(pid, 80, 1.75, 30, "Masculino")
+        self.db.salvar_registro(pid, 85, 1.75, 30, "Masculino")
+        hist = self.db.buscar_historico_com_id(pid)
+        self.assertEqual(len(hist), 3)
+        alvo = hist[-1]  # medição mais antiga (75 kg)
+        self.assertTrue(self.db.excluir_registro(alvo[0]))
+        restante = self.db.buscar_historico_com_id(pid)
+        self.assertEqual(len(restante), 2)
+        self.assertNotIn(alvo[0], [r[0] for r in restante])
+        self.assertNotIn(75, [r[1] for r in restante])
+
+    def test_excluir_registro_inexistente_retorna_false(self):
+        self.assertFalse(self.db.excluir_registro(9999))
+
+    def test_buscar_historico_com_id_inclui_id_e_ordem(self):
+        pid = self.db.criar_perfil("João", 30, "Masculino")
+        self.db.salvar_registro(pid, 75, 1.75, 30, "Masculino")
+        self.db.salvar_registro(pid, 76, 1.75, 30, "Masculino")
+        hist = self.db.buscar_historico_com_id(pid)
+        self.assertEqual(len(hist[0]), 6)
+        self.assertEqual(hist[0][1], 76)  # mais recente primeiro
+
     # ---------- Composição corporal (gordura, RCQ, risco) ----------
     def test_gordura_corporal_deurenberg(self):
         g = self.db.calcular_gordura_corporal(22, 30, "Masculino")
@@ -179,7 +204,9 @@ class TestDatabase(unittest.TestCase):
         try:
             db = Database(tmp.name)
             colunas = [c[1] for c in db.conectar().execute("PRAGMA table_info(historico)").fetchall()]
-            for col in ("cintura_cm", "quadril_cm", "gordura_pct", "rcq", "risco_cintura"):
+            for col in ("cintura_cm", "quadril_cm", "gordura_pct", "rcq", "risco_cintura",
+                        "tmb_mifflin", "get_total", "prega_peitoral", "prega_coxa",
+                        "prega_tricipital", "prega_suprailiaca", "gordura_pct_pregas"):
                 self.assertIn(col, colunas)
             hist = db.buscar_historico(1)
             self.assertEqual(len(hist), 1)

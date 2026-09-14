@@ -67,6 +67,59 @@ class TestFatoresAtividade(unittest.TestCase):
         self.assertAlmostEqual(d["get"], esperado, places=1)
 
 
+class TestPregasCutaneas(unittest.TestCase):
+    """Valida o protocolo de 3 dobras (Jackson & Pollock) + equação de Siri."""
+
+    def _esperado(self, soma, idade, genero):
+        soma2 = soma ** 2
+        if genero == "Masculino":
+            dc = 1.10938 - 0.0008267 * soma + 0.0000016 * soma2 - 0.0002574 * idade
+        elif genero == "Feminino":
+            dc = 1.0994921 - 0.0009929 * soma + 0.0000023 * soma2 - 0.0001392 * idade
+        else:
+            masc = 1.10938 - 0.0008267 * soma + 0.0000016 * soma2 - 0.0002574 * idade
+            fem = 1.0994921 - 0.0009929 * soma + 0.0000023 * soma2 - 0.0001392 * idade
+            dc = (masc + fem) / 2.0
+        return round((4.95 / dc - 4.50) * 100.0, 1)
+
+    def test_pregas_3_obrigatorias_por_genero(self):
+        self.assertEqual(nutricao.pregas_3_obrigatorias("Masculino"),
+                         ("peitoral", "abdominal", "coxa"))
+        self.assertEqual(nutricao.pregas_3_obrigatorias("Feminino"),
+                         ("tricipital", "suprailiaca", "coxa"))
+
+    def test_gordura_homem(self):
+        pregas = {"peitoral": 15, "abdominal": 20, "coxa": 25}
+        self.assertEqual(nutricao.gordura_pct_pregas(pregas, 30, "Masculino"),
+                         self._esperado(60, 30, "Masculino"))
+
+    def test_gordura_mulher(self):
+        pregas = {"tricipital": 18, "suprailiaca": 16, "coxa": 22}
+        self.assertEqual(nutricao.gordura_pct_pregas(pregas, 35, "Feminino"),
+                         self._esperado(56, 35, "Feminino"))
+
+    def test_gordura_outro_usa_media(self):
+        pregas = {"tricipital": 18, "suprailiaca": 16, "coxa": 22}
+        self.assertEqual(nutricao.gordura_pct_pregas(pregas, 35, "Outro"),
+                         self._esperado(56, 35, "Outro"))
+
+    def test_falta_prega_retorna_none(self):
+        self.assertIsNone(nutricao.gordura_pct_pregas({"peitoral": 15, "abdominal": 20},
+                                                      30, "Masculino"))
+        self.assertIsNone(nutricao.gordura_pct_pregas({}, 30, "Masculino"))
+        self.assertIsNone(nutricao.gordura_pct_pregas(None, 30, "Masculino"))
+
+    def test_valor_fora_da_faixa_retorna_none(self):
+        pregas = {"peitoral": 1.5, "abdominal": 20, "coxa": 25}  # abaixo do mínimo
+        self.assertIsNone(nutricao.gordura_pct_pregas(pregas, 30, "Masculino"))
+        pregas2 = {"peitoral": 15, "abdominal": 20, "coxa": 120}  # acima do máximo
+        self.assertIsNone(nutricao.gordura_pct_pregas(pregas2, 30, "Masculino"))
+
+    def test_menor_de_18_retorna_none(self):
+        pregas = {"peitoral": 15, "abdominal": 20, "coxa": 25}
+        self.assertIsNone(nutricao.gordura_pct_pregas(pregas, 10, "Masculino"))
+
+
 class TestPersistenciaNutricional(unittest.TestCase):
     """Garante que TMB/GET são calculados e salvos no histórico."""
 
@@ -105,6 +158,28 @@ class TestPersistenciaNutricional(unittest.TestCase):
         self.assertIsNone(nutri[1])  # tmb_harris
         self.assertIsNone(nutri[4])  # get_total
 
+    def test_salva_registro_com_pregas(self):
+        pid = self.db.criar_perfil("Carlos", 30, "Masculino")
+        self.db.salvar_registro(pid, 80, 1.8, 30, "Masculino",
+                                pregas={"peitoral": 15, "abdominal": 20, "coxa": 25})
+        pregas = self.db.buscar_ultima_pregas(pid)
+        self.assertIsNotNone(pregas)
+        gordura, peit, abd, coxa, tri, supra = pregas
+        self.assertIsNotNone(gordura)
+        self.assertAlmostEqual(peit, 15.0, places=1)
+        self.assertAlmostEqual(abd, 20.0, places=1)
+        self.assertAlmostEqual(coxa, 25.0, places=1)
+        self.assertIsNone(tri)
+        self.assertIsNone(supra)
+
+    def test_menor_de_18_nao_salva_gordura_pregas(self):
+        pid = self.db.criar_perfil("Jovem", 15, "Masculino")
+        self.db.salvar_registro(pid, 55, 1.65, 15, "Masculino",
+                                pregas={"peitoral": 15, "abdominal": 20, "coxa": 25})
+        pregas = self.db.buscar_ultima_pregas(pid)
+        self.assertIsNotNone(pregas)
+        self.assertIsNone(pregas[0])  # gordura_pct_pregas
+
 
 class TestRelatorioNutricional(unittest.TestCase):
     """O relatório PDF deve aceitar o bloco de gasto energético sem erro."""
@@ -124,6 +199,18 @@ class TestRelatorioNutricional(unittest.TestCase):
         relatorio.gerar_pdf_relatorio(
             caminho, "Ana", 30, "Feminino", 60, 1.65, 22.04, "Peso Normal",
             50.4, 67.8, "#2ECC71", meta=58.0, nutricional=nutricional)
+        self.assertTrue(os.path.exists(caminho))
+        with open(caminho, "rb") as f:
+            self.assertEqual(f.read(4), b"%PDF")
+
+    def test_relatorio_inclui_pregas(self):
+        import relatorio
+        caminho = os.path.join(self.tmpdir, "relatorio_pregas.pdf")
+        # pregas = (gordura_pct_pregas, peitoral, abdominal, coxa, tricipital, suprailiaca)
+        pregas = (17.9, 15.0, 20.0, 25.0, None, None)
+        relatorio.gerar_pdf_relatorio(
+            caminho, "Carlos", 30, "Masculino", 80, 1.80, 24.69, "Peso Normal",
+            61.5, 82.7, "#2ECC71", pregas=pregas)
         self.assertTrue(os.path.exists(caminho))
         with open(caminho, "rb") as f:
             self.assertEqual(f.read(4), b"%PDF")
