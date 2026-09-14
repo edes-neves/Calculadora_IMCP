@@ -21,7 +21,7 @@ import caminhos
 import logger
 
 REPOSITORIO = "edes-neves/Calculadora_IMCP"
-VERSAO_ATUAL = "1.1.0"
+VERSAO_ATUAL = "1.1.1"
 ASSET_PREFERENCIAL = ".appimage"
 API_RELEASES = f"https://api.github.com/repos/{REPOSITORIO}/releases/latest"
 URL_RELEASES = f"https://github.com/{REPOSITORIO}/releases/latest"
